@@ -9,9 +9,7 @@ public interface Interpreter<A, R> {
 
     R run(Fn0<A> thunk);
 
-    <Z> R run(com.jnape.palatable.lambda.newIO.IO<Z> ioZ, com.jnape.palatable.lambda.newIO.IO<Fn1<? super Z, ? extends A>> ioF);
+    <Z> R run(IO<Z> ioZ, IO<Fn1<? super Z, ? extends A>> ioF);
 
-    <Z> R run(com.jnape.palatable.lambda.newIO.IO<Z> ioZ, Fn1<? super Z, ? extends IO<A>> f);
-
-
+    <Z> R run(IO<Z> ioZ, Fn1<? super Z, ? extends IO<A>> f);
 }
