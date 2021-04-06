@@ -16,24 +16,24 @@ public final class UnsafeRunSync<A> implements Interpreter<A, A> {
     }
 
     @Override
-    public A run(A a) {
+    public A interpret(A a) {
         return a;
     }
 
     @Override
-    public A run(Fn0<A> thunk) {
+    public A interpret(Fn0<A> thunk) {
         return thunk.apply();
     }
 
     @Override
-    public <Z> A run(IO<Z> ioZ, IO<Fn1<? super Z, ? extends A>> ioF) {
+    public <Z> A interpret(IO<Z> ioZ, IO<Fn1<? super Z, ? extends A>> ioF) {
         Z                           z = unsafeRun(ioZ);
         Fn1<? super Z, ? extends A> f = unsafeRun(ioF);
         return f.apply(z);
     }
 
     @Override
-    public <Z> A run(IO<Z> ioZ, Fn1<? super Z, ? extends IO<A>> f) {
+    public <Z> A interpret(IO<Z> ioZ, Fn1<? super Z, ? extends IO<A>> f) {
         return unsafeRun(f.apply(unsafeRun(ioZ)));
     }
 
@@ -52,22 +52,22 @@ public final class UnsafeRunSync<A> implements Interpreter<A, A> {
         }
 
         @Override
-        public RecursiveResult<IO<A>, A> run(A a) {
+        public RecursiveResult<IO<A>, A> interpret(A a) {
             return terminate(a);
         }
 
         @Override
-        public RecursiveResult<IO<A>, A> run(Fn0<A> thunk) {
+        public RecursiveResult<IO<A>, A> interpret(Fn0<A> thunk) {
             return terminate(thunk.apply());
         }
 
         @Override
-        public <Z> RecursiveResult<IO<A>, A> run(IO<Z> ioZ, IO<Fn1<? super Z, ? extends A>> ioF) {
+        public <Z> RecursiveResult<IO<A>, A> interpret(IO<Z> ioZ, IO<Fn1<? super Z, ? extends A>> ioF) {
             return recurse(ioZ.then(z -> ioF.then(f -> IO.io(f.apply(z)))));
         }
 
         @Override
-        public <Z> RecursiveResult<IO<A>, A> run(IO<Z> ioZ, Fn1<? super Z, ? extends IO<A>> f) {
+        public <Z> RecursiveResult<IO<A>, A> interpret(IO<Z> ioZ, Fn1<? super Z, ? extends IO<A>> f) {
             return recurse(ioZ.interpret(Psi.psi(f)));
         }
     }
@@ -80,22 +80,22 @@ public final class UnsafeRunSync<A> implements Interpreter<A, A> {
         }
 
         @Override
-        public IO<A> run(Z z) {
+        public IO<A> interpret(Z z) {
             return f.apply(z);
         }
 
         @Override
-        public IO<A> run(Fn0<Z> thunk) {
+        public IO<A> interpret(Fn0<Z> thunk) {
             return f.apply(thunk.apply());
         }
 
         @Override
-        public <Y> IO<A> run(IO<Y> ioY, IO<Fn1<? super Y, ? extends Z>> ioG) {
+        public <Y> IO<A> interpret(IO<Y> ioY, IO<Fn1<? super Y, ? extends Z>> ioG) {
             return ioY.then(y -> ioG.then(g -> f.apply(g.apply(y))));
         }
 
         @Override
-        public <Y> IO<A> run(IO<Y> ioY, Fn1<? super Y, ? extends IO<Z>> g) {
+        public <Y> IO<A> interpret(IO<Y> ioY, Fn1<? super Y, ? extends IO<Z>> g) {
             return ioY.then(y -> g.apply(y).then(f));
         }
 

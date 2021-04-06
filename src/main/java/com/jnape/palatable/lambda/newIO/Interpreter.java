@@ -5,11 +5,11 @@ import com.jnape.palatable.lambda.functions.Fn1;
 
 public interface Interpreter<A, R> {
 
-    R run(A a);
+    R interpret(A a);
 
-    R run(Fn0<A> thunk);
+    R interpret(Fn0<A> thunk);
 
-    <Z> R run(IO<Z> ioZ, IO<Fn1<? super Z, ? extends A>> ioF);
+    <Z> R interpret(IO<Z> ioZ, IO<Fn1<? super Z, ? extends A>> ioF);
 
-    <Z> R run(IO<Z> ioZ, Fn1<? super Z, ? extends IO<A>> f);
+    <Z> R interpret(IO<Z> ioZ, Fn1<? super Z, ? extends IO<A>> f);
 }

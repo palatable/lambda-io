@@ -51,7 +51,7 @@ public abstract class IO<A> {
 
         @Override
         public <R> R interpret(Interpreter<A, R> interpreter) {
-            return interpreter.run(a);
+            return interpreter.interpret(a);
         }
     }
 
@@ -64,7 +64,7 @@ public abstract class IO<A> {
 
         @Override
         public <R> R interpret(Interpreter<A, R> interpreter) {
-            return interpreter.run(thunk);
+            return interpreter.interpret(thunk);
         }
     }
 
@@ -79,7 +79,7 @@ public abstract class IO<A> {
 
         @Override
         public <R> R interpret(Interpreter<A, R> interpreter) {
-            return interpreter.run(ioZ, ioF);
+            return interpreter.interpret(ioZ, ioF);
         }
     }
 
@@ -94,7 +94,7 @@ public abstract class IO<A> {
 
         @Override
         public <R> R interpret(Interpreter<A, R> interpreter) {
-            return interpreter.run(ioZ, f);
+            return interpreter.interpret(ioZ, f);
         }
     }
 }
