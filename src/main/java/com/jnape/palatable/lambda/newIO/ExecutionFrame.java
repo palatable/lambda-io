@@ -16,8 +16,6 @@ import static com.jnape.palatable.lambda.functions.Fn0.fn0;
 import static com.jnape.palatable.lambda.functions.builtin.fn3.Times.times;
 import static com.jnape.palatable.lambda.functions.recursion.RecursiveResult.recurse;
 import static com.jnape.palatable.lambda.functions.recursion.RecursiveResult.terminate;
-import static com.jnape.palatable.lambda.newIO.ExecutionFrame.SyncFrame.syncFlatMap;
-import static com.jnape.palatable.lambda.newIO.ExecutionFrame.SyncFrame.syncZip;
 import static com.jnape.palatable.lambda.newIO.ExecutionSpine.asyncSpine;
 import static com.jnape.palatable.lambda.newIO.ExecutionSpine.syncSpine;
 import static java.util.concurrent.ForkJoinPool.commonPool;
@@ -25,9 +23,9 @@ import static java.util.concurrent.ForkJoinPool.commonPool;
 public interface ExecutionFrame<Context> {
     RecursiveResult<ExecutionSpine, Unit> pop(Context context);
 
-    interface AsyncFrame<A> extends ExecutionFrame<SyncFrame<A>> {
+    interface AsyncFrame<A> extends ExecutionFrame<ExecutionFrame<A>> {
 
-        static <A> AsyncFrame<A> asyncFrame(Fn1<Fn1<? super A, ? extends Unit>, Unit> k) {
+        static <A> ExecutionFrame<ExecutionFrame<A>> asyncFrame(Fn1<Fn1<? super A, ? extends Unit>, Unit> k) {
             return syncFrame -> {
                 // todo: disaster
                 AtomicBoolean                     isAsync = new AtomicBoolean();
@@ -49,54 +47,59 @@ public interface ExecutionFrame<Context> {
             };
         }
 
-        static <A> AsyncFrame<A> fork(Fn0<A> fn0, Executor executor) {
+        static <A> ExecutionFrame<ExecutionFrame<A>> fork(Fn0<A> fn0, Executor executor) {
             return asyncFrame(f -> {
                 executor.execute(() -> f.apply(fn0.apply()));
                 return UNIT;
             });
         }
 
-        static <A> AsyncFrame<A> value(A a) {
+        static <A> ExecutionFrame<ExecutionFrame<A>> value(A a) {
             return syncFrame -> syncFrame.pop(a);
         }
 
-        static <Z, A> AsyncFrame<A> map(Fn1<? super Z, ? extends A> fn, AsyncFrame<Z> asyncFrame) {
+        static <Z, A> ExecutionFrame<ExecutionFrame<A>> map(Fn1<? super Z, ? extends A> fn,
+                                                            ExecutionFrame<ExecutionFrame<Z>> asyncFrame) {
             return syncFrame -> recurse(asyncSpine(asyncFrame, SyncFrame.map(fn, syncFrame)));
         }
 
-        static <Z, A> AsyncFrame<A> zip(AsyncFrame<Fn1<? super Z, ? extends A>> asyncFrameF,
-                                        AsyncFrame<Z> asyncFrame) {
-            return syncFrame -> recurse(asyncSpine(asyncFrameF, syncZip(asyncFrame, syncFrame)));
+        static <Z, A> ExecutionFrame<ExecutionFrame<A>> zip(
+                ExecutionFrame<ExecutionFrame<Fn1<? super Z, ? extends A>>> asyncFrameF,
+                ExecutionFrame<ExecutionFrame<Z>> asyncFrame) {
+            return syncFrame -> recurse(asyncSpine(asyncFrameF, SyncFrame.zip(asyncFrame, syncFrame)));
         }
 
-        static <Z, A> AsyncFrame<A> flatMap(AsyncFrame<Z> asyncFrame, Fn1<? super Z, ? extends AsyncFrame<A>> fn) {
-            return syncFrame -> recurse(asyncSpine(asyncFrame, syncFlatMap(fn, syncFrame)));
+        static <Z, A> ExecutionFrame<ExecutionFrame<A>> flatMap(ExecutionFrame<ExecutionFrame<Z>> asyncFrame,
+                                                                Fn1<? super Z, ? extends ExecutionFrame<ExecutionFrame<A>>> fn) {
+            return syncFrame -> recurse(asyncSpine(asyncFrame, SyncFrame.flatMap(fn, syncFrame)));
         }
     }
 
     interface SyncFrame<A> extends ExecutionFrame<A> {
 
-        static <A> SyncFrame<A> syncFrame(Fn1<? super A, ? extends Unit> k) {
+        static <A> ExecutionFrame<A> terminalFrame(Fn1<? super A, ? extends Unit> k) {
             return a -> terminate(k.apply(a));
         }
 
-        static <A, B> SyncFrame<A> map(Fn1<? super A, ? extends B> fn, SyncFrame<B> syncFrame) {
+        static <A, B> ExecutionFrame<A> map(Fn1<? super A, ? extends B> fn, ExecutionFrame<B> syncFrame) {
             return a -> recurse(syncSpine(syncFrame, fn.apply(a)));
         }
 
-        static <A, B> SyncFrame<Fn1<? super A, ? extends B>> syncZip(AsyncFrame<A> asyncFrame, SyncFrame<B> syncFrame) {
+        static <A, B> ExecutionFrame<Fn1<? super A, ? extends B>> zip(ExecutionFrame<ExecutionFrame<A>> asyncFrame,
+                                                                      ExecutionFrame<B> syncFrame) {
             return f -> recurse(asyncSpine(asyncFrame, map(f, syncFrame)));
         }
 
-        static <A, B> SyncFrame<A> syncFlatMap(Fn1<? super A, ? extends AsyncFrame<B>> fn, SyncFrame<B> syncFrame) {
+        static <A, B> ExecutionFrame<A> flatMap(Fn1<? super A, ? extends ExecutionFrame<ExecutionFrame<B>>> fn,
+                                                ExecutionFrame<B> syncFrame) {
             return a -> recurse(asyncSpine(fn.apply(a), syncFrame));
         }
     }
 
     static void main(String[] args) {
-        int n = 20_000_000;
+        int          n  = 20_000_000;
         ForkJoinPool ex = commonPool();
-        AsyncFrame<Integer> deeplyLeftAssociated = times(
+        ExecutionFrame<ExecutionFrame<Integer>> deeplyLeftAssociated = times(
                 n,
                 f -> AsyncFrame.map(x -> x + 1, f),
                 AsyncFrame.asyncFrame(k -> {
@@ -110,7 +113,7 @@ public interface ExecutionFrame<Context> {
         int i = 0;
         while (i++ < 10) {
             new CompletableFuture<Integer>() {{
-                ExecutionSpine application = asyncSpine(deeplyLeftAssociated, SyncFrame.syncFrame(x -> {
+                ExecutionSpine application = asyncSpine(deeplyLeftAssociated, SyncFrame.terminalFrame(x -> {
                     complete(x);
                     return UNIT;
                 }));
