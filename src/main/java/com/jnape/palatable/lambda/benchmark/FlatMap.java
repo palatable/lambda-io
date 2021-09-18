@@ -21,13 +21,13 @@ public final class FlatMap {
         Tuple2<Long, Long> oldTimings = benchmark(
                 "Sync: Old FlatMap",
                 com.jnape.palatable.lambda.io.IO.io(() -> 0),
-                io -> io.flatMap(x -> com.jnape.palatable.lambda.io.IO.io(() -> x + 1)),
+                io -> io.flatMap(x -> com.jnape.palatable.lambda.io.IO.io(x + 1)),
                 com.jnape.palatable.lambda.io.IO::unsafePerformIO,
                 samples);
         Tuple2<Long, Long> newTimings = benchmark(
                 "Sync: New FlatMap",
                 io(() -> 0),
-                io -> io.then(x -> io(() -> x + 1)),
+                io -> io.bind(x -> io(x + 1)),
                 IO::unsafePerformIO,
                 samples);
 

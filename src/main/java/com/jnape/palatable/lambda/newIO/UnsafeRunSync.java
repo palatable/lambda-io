@@ -4,9 +4,13 @@ import com.jnape.palatable.lambda.functions.Fn0;
 import com.jnape.palatable.lambda.functions.Fn1;
 import com.jnape.palatable.lambda.functions.recursion.RecursiveResult;
 
+import java.util.concurrent.CompletableFuture;
+
 import static com.jnape.palatable.lambda.functions.recursion.RecursiveResult.recurse;
 import static com.jnape.palatable.lambda.functions.recursion.RecursiveResult.terminate;
 import static com.jnape.palatable.lambda.functions.recursion.Trampoline.trampoline;
+import static com.jnape.palatable.lambda.newIO.Callback.callback;
+import static com.jnape.palatable.lambda.newIO.IO.io;
 
 public final class UnsafeRunSync<A> implements Interpreter<A, A> {
 
@@ -26,10 +30,20 @@ public final class UnsafeRunSync<A> implements Interpreter<A, A> {
     }
 
     @Override
+    public A interpret(Callback<? super Callback<? super A>> k) {
+        return await(k);
+    }
+
+    private static <A> A await(Callback<? super Callback<? super A>> k) {
+        return new CompletableFuture<A>() {{
+            k.apply(callback(this::complete));
+        }}.join();
+    }
+
+    @Override
     public <Z> A interpret(IO<Z> ioZ, IO<Fn1<? super Z, ? extends A>> ioF) {
-        Z                           z = unsafeRun(ioZ);
-        Fn1<? super Z, ? extends A> f = unsafeRun(ioF);
-        return f.apply(z);
+        Z z = unsafeRun(ioZ);
+        return unsafeRun(ioF).apply(z);
     }
 
     @Override
@@ -38,7 +52,7 @@ public final class UnsafeRunSync<A> implements Interpreter<A, A> {
     }
 
     private static <A> A unsafeRun(IO<A> io) {
-        Interpreter<A, RecursiveResult<IO<A>, A>> phi = Phi.phi();
+        Phi<A> phi = Phi.phi();
         return trampoline(io_ -> io_.interpret(phi), io);
     }
 
@@ -62,8 +76,13 @@ public final class UnsafeRunSync<A> implements Interpreter<A, A> {
         }
 
         @Override
+        public RecursiveResult<IO<A>, A> interpret(Callback<? super Callback<? super A>> k) {
+            return terminate(await(k));
+        }
+
+        @Override
         public <Z> RecursiveResult<IO<A>, A> interpret(IO<Z> ioZ, IO<Fn1<? super Z, ? extends A>> ioF) {
-            return recurse(ioZ.then(z -> ioF.then(f -> IO.io(f.apply(z)))));
+            return recurse(ioZ.bind(z -> ioF.bind(f -> io(f.apply(z)))));
         }
 
         @Override
@@ -90,13 +109,18 @@ public final class UnsafeRunSync<A> implements Interpreter<A, A> {
         }
 
         @Override
+        public IO<A> interpret(Callback<? super Callback<? super Z>> k) {
+            return f.apply(await(k));
+        }
+
+        @Override
         public <Y> IO<A> interpret(IO<Y> ioY, IO<Fn1<? super Y, ? extends Z>> ioG) {
-            return ioY.then(y -> ioG.then(g -> f.apply(g.apply(y))));
+            return ioY.bind(y -> ioG.bind(g -> f.apply(g.apply(y))));
         }
 
         @Override
         public <Y> IO<A> interpret(IO<Y> ioY, Fn1<? super Y, ? extends IO<Z>> g) {
-            return ioY.then(y -> g.apply(y).then(f));
+            return ioY.bind(y -> g.apply(y).bind(f));
         }
 
         private static <Z, A> Psi<Z, A> psi(Fn1<? super Z, ? extends IO<A>> f) {
