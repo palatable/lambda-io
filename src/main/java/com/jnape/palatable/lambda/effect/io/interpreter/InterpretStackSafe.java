@@ -1,8 +1,11 @@
-package com.jnape.palatable.lambda.newIO;
+package com.jnape.palatable.lambda.effect.io.interpreter;
 
 import com.jnape.palatable.lambda.adt.Either;
 import com.jnape.palatable.lambda.adt.Try;
 import com.jnape.palatable.lambda.adt.Unit;
+import com.jnape.palatable.lambda.effect.io.Callback;
+import com.jnape.palatable.lambda.effect.io.IO;
+import com.jnape.palatable.lambda.effect.io.Interpreter;
 import com.jnape.palatable.lambda.functions.Fn0;
 import com.jnape.palatable.lambda.functions.Fn1;
 import com.jnape.palatable.lambda.functions.recursion.RecursiveResult;
@@ -13,11 +16,11 @@ import static com.jnape.palatable.lambda.adt.Either.left;
 import static com.jnape.palatable.lambda.adt.Either.right;
 import static com.jnape.palatable.lambda.adt.Try.failure;
 import static com.jnape.palatable.lambda.adt.Unit.UNIT;
+import static com.jnape.palatable.lambda.effect.io.Callback.callback;
+import static com.jnape.palatable.lambda.effect.io.IO.io;
 import static com.jnape.palatable.lambda.functions.recursion.RecursiveResult.recurse;
 import static com.jnape.palatable.lambda.functions.recursion.RecursiveResult.terminate;
 import static com.jnape.palatable.lambda.functions.recursion.Trampoline.trampoline;
-import static com.jnape.palatable.lambda.newIO.Callback.callback;
-import static com.jnape.palatable.lambda.newIO.IO.io;
 
 public final class InterpretStackSafe<A, R> implements Interpreter<A, R> {
 
@@ -28,9 +31,9 @@ public final class InterpretStackSafe<A, R> implements Interpreter<A, R> {
     }
 
     public interface QuantifiedG<A, R> {
-        R universal(Fn0<A> f);
+        R universal(Fn0<? extends A> f);
 
-        <X> Either<X, R> existential(Fn0<X> f);
+        <X> Either<X, R> existential(Fn0<? extends X> f);
     }
 
     public interface QuantifiedH<A, R> {
@@ -51,18 +54,25 @@ public final class InterpretStackSafe<A, R> implements Interpreter<A, R> {
         this.h = h;
     }
 
+    public static <A, R> InterpretStackSafe<A, R> interpretStackSafe(QuantifiedF<A, R> f,
+                                                                     QuantifiedG<A, R> g,
+                                                                     QuantifiedH<A, R> h) {
+        return new InterpretStackSafe<>(f, g, h);
+    }
+
     @Override
     public R interpret(A a) {
         return f.universal(a);
     }
 
     @Override
-    public R interpret(Fn0<A> thunk) {
+    public R interpret(Fn0<? extends A> thunk) {
         return g.universal(thunk);
     }
 
     @Override
     public R interpret(Callback<? super Callback<? super A>> k) {
+
         return h.universal(k);
     }
 
@@ -87,7 +97,7 @@ public final class InterpretStackSafe<A, R> implements Interpreter<A, R> {
             }
 
             @Override
-            public RecursiveResult<IO<A>, R> interpret(Fn0<A> thunk) {
+            public RecursiveResult<IO<A>, R> interpret(Fn0<? extends A> thunk) {
                 return terminate(g.universal(thunk));
             }
 
@@ -106,7 +116,7 @@ public final class InterpretStackSafe<A, R> implements Interpreter<A, R> {
                     }
 
                     @Override
-                    public RecursiveResult<IO<A>, R> interpret(Fn0<Z> thunk) {
+                    public RecursiveResult<IO<A>, R> interpret(Fn0<? extends Z> thunk) {
                         return g.existential(thunk).match(z_ -> recurse(ioZA.bind(za -> io(za.apply(z_)))),
                                                           RecursiveResult::terminate);
                     }
@@ -139,7 +149,7 @@ public final class InterpretStackSafe<A, R> implements Interpreter<A, R> {
                     }
 
                     @Override
-                    public RecursiveResult<IO<A>, R> interpret(Fn0<Z> thunk) {
+                    public RecursiveResult<IO<A>, R> interpret(Fn0<? extends Z> thunk) {
                         return g.existential(thunk).match(z_ -> recurse(xx.apply(z_)),
                                                           RecursiveResult::terminate);
                     }
@@ -180,12 +190,12 @@ public final class InterpretStackSafe<A, R> implements Interpreter<A, R> {
                 },
                 new QuantifiedG<>() {
                     @Override
-                    public Try<A> universal(Fn0<A> f) {
+                    public Try<A> universal(Fn0<? extends A> f) {
                         return Try.trying(f);
                     }
 
                     @Override
-                    public <X> Either<X, Try<A>> existential(Fn0<X> f) {
+                    public <X> Either<X, Try<A>> existential(Fn0<? extends X> f) {
                         return Try.trying(f).match(t -> right(failure(t)), Either::left);
                     }
                 },
@@ -209,6 +219,47 @@ public final class InterpretStackSafe<A, R> implements Interpreter<A, R> {
                 });
     }
 
+    public static <A> InterpretStackSafe<A, A> runSync() {
+        return interpretStackSafe(
+                new QuantifiedF<A, A>() {
+                    @Override
+                    public A universal(A a) {
+                        return a;
+                    }
+
+                    @Override
+                    public <X> Either<X, A> existential(X x) {
+                        return left(x);
+                    }
+                },
+                new QuantifiedG<A, A>() {
+                    @Override
+                    public A universal(Fn0<? extends A> f) {
+                        return f.apply();
+                    }
+
+                    @Override
+                    public <X> Either<X, A> existential(Fn0<? extends X> f) {
+                        return left(f.apply());
+                    }
+                },
+                new QuantifiedH<A, A>() {
+                    @Override
+                    public A universal(Callback<? super Callback<? super A>> k) {
+                        return new CompletableFuture<A>() {{
+                            k.apply(callback(this::complete));
+                        }}.join();
+                    }
+
+                    @Override
+                    public <X> Either<X, A> existential(Callback<? super Callback<? super X>> k) {
+                        return left(new CompletableFuture<X>() {{
+                            k.apply(callback(this::complete));
+                        }}.join());
+                    }
+                });
+    }
+
     public static void main(String[] args) {
 
         class Slot {
@@ -217,7 +268,7 @@ public final class InterpretStackSafe<A, R> implements Interpreter<A, R> {
         }
         Slot slot = new Slot();
 
-        System.out.println(forever(IO.<Unit>async(k -> {
+        System.out.println(forever(IO.<Unit>io(k -> {
             int x = slot.x++;
 
             if (x % 10_000_000 == 0) {

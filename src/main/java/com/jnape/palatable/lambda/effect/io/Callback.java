@@ -1,4 +1,4 @@
-package com.jnape.palatable.lambda.newIO;
+package com.jnape.palatable.lambda.effect.io;
 
 import com.jnape.palatable.lambda.adt.Unit;
 import com.jnape.palatable.lambda.functions.Fn1;

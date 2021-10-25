@@ -1,15 +1,17 @@
 package com.jnape.palatable.lambda.effect.io;
 
 import com.jnape.palatable.lambda.adt.Unit;
+import com.jnape.palatable.lambda.benchmark.Sample;
 import com.jnape.palatable.lambda.effect.io.interpreter.RunSync;
 import com.jnape.palatable.lambda.functions.Fn0;
 import com.jnape.palatable.lambda.functions.Fn1;
 import com.jnape.palatable.lambda.functions.specialized.SideEffect;
-import com.jnape.palatable.lambda.newIO.Callback;
 
 import java.util.concurrent.Executor;
 
-import static com.jnape.palatable.lambda.functions.builtin.fn3.Times.times;
+import static com.jnape.palatable.lambda.adt.Unit.UNIT;
+import static com.jnape.palatable.lambda.benchmark.Sample.sample;
+import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
 public sealed interface IO<A> {
 
@@ -23,10 +25,6 @@ public sealed interface IO<A> {
         return new Sequential<>(this, f);
     }
 
-    default A unsafePerformIO() {
-        return RunSync.unsafeRunSync(this);
-    }
-
     static <A> IO<A> io(A a) {
         return new Value<>(a);
     }
@@ -35,35 +33,10 @@ public sealed interface IO<A> {
         return new Suspension<>(thunk);
     }
 
-    public static void main(String[] args) {
-
-        class Slot {
-            long x = 0;
-        }
-        Slot slot = new Slot();
-        forever(io(() -> {
-            if (slot.x++ % 50_000_000 == 0)
-                System.out.println(slot.x - 1);
-        })).unsafePerformIO();
-
-        times(10_000_000,
-              io -> io.bind(x -> io(k -> {
-                  if (x % 100_000 == 0)
-                      System.out.println(x);
-                  k.call(x + 1);
-              })),
-              IO.<Integer>io(k -> k.call(0)))
-                .unsafePerformIO();
-    }
-
-    static <A, B> IO<B> forever(IO<A> io) {
-        return io.bind(__ -> forever(io));
-    }
-
     static IO<Unit> io(SideEffect sideEffect) {
         return io(() -> {
             sideEffect.Ω();
-            return Unit.UNIT;
+            return UNIT;
         });
     }
 
@@ -71,8 +44,19 @@ public sealed interface IO<A> {
         return new Async<>(k);
     }
 
+    static IO<Unit> fork(SideEffect sideEffect, Executor executor) {
+        return fork(() -> {
+            sideEffect.Ω();
+            return UNIT;
+        }, executor);
+    }
+
     static <A> IO<A> fork(Fn0<? extends A> thunk, Executor executor) {
         return io(k -> executor.execute(() -> k.apply(thunk.apply())));
+    }
+
+    static <A, B> IO<B> forever(IO<A> io) {
+        return io.bind(__ -> forever(io));
     }
 }
 

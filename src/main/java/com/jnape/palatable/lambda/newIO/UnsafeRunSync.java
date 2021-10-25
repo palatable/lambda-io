@@ -1,5 +1,6 @@
 package com.jnape.palatable.lambda.newIO;
 
+import com.jnape.palatable.lambda.effect.io.Callback;
 import com.jnape.palatable.lambda.functions.Fn0;
 import com.jnape.palatable.lambda.functions.Fn1;
 import com.jnape.palatable.lambda.functions.recursion.RecursiveResult;
@@ -9,7 +10,7 @@ import java.util.concurrent.CompletableFuture;
 import static com.jnape.palatable.lambda.functions.recursion.RecursiveResult.recurse;
 import static com.jnape.palatable.lambda.functions.recursion.RecursiveResult.terminate;
 import static com.jnape.palatable.lambda.functions.recursion.Trampoline.trampoline;
-import static com.jnape.palatable.lambda.newIO.Callback.callback;
+import static com.jnape.palatable.lambda.effect.io.Callback.callback;
 import static com.jnape.palatable.lambda.newIO.IO.io;
 
 public final class UnsafeRunSync<A> implements Interpreter<A, A> {

@@ -1,6 +1,7 @@
 package com.jnape.palatable.lambda.newIO;
 
 import com.jnape.palatable.lambda.adt.Unit;
+import com.jnape.palatable.lambda.effect.io.Callback;
 import com.jnape.palatable.lambda.functions.Fn0;
 import com.jnape.palatable.lambda.functions.Fn1;
 import com.jnape.palatable.lambda.functions.specialized.SideEffect;
@@ -14,6 +15,7 @@ import static com.jnape.palatable.lambda.adt.Unit.UNIT;
 import static com.jnape.palatable.lambda.newIO.UnsafeRunAsync.unsafeRunAsync;
 import static com.jnape.palatable.lambda.newIO.UnsafeRunSync.unsafeRunSync;
 
+@Deprecated
 public abstract class IO<A> {
 
     private IO() {

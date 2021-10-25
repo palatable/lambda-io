@@ -1,5 +1,6 @@
 package com.jnape.palatable.lambda.newIO;
 
+import com.jnape.palatable.lambda.effect.io.Callback;
 import com.jnape.palatable.lambda.functions.Fn0;
 import com.jnape.palatable.lambda.functions.Fn1;
 

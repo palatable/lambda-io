@@ -7,7 +7,7 @@ import com.jnape.palatable.lambda.effect.io.interpreter.RecursiveCase.Terminal;
 import com.jnape.palatable.lambda.functions.Fn0;
 import com.jnape.palatable.lambda.functions.Fn1;
 import com.jnape.palatable.lambda.internal.Runtime;
-import com.jnape.palatable.lambda.newIO.Callback;
+import com.jnape.palatable.lambda.effect.io.Callback;
 
 import static com.jnape.palatable.lambda.effect.io.IO.io;
 
