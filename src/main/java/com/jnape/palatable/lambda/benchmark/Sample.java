@@ -31,7 +31,8 @@ public final class Sample {
             long elapsedNanos = System.nanoTime() - startNanos;
             long sample       = count - 1;
             long elapsedTime  = elapsedNanos / timeResolutionCoefficient;
-            System.out.format("Sample: %d (%f/%s average, %d%s elapsed)",
+            System.out.format("[%s] Sample: %d (%f/%s average, %d%s elapsed)",
+                              Thread.currentThread().getName(),
                               sample,
                               ((float) sample) / elapsedTime,
                               timeUnit,

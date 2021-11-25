@@ -2,8 +2,8 @@ package com.jnape.palatable.lambda.effect.io.interpreter;
 
 import com.jnape.palatable.lambda.effect.io.IO;
 import com.jnape.palatable.lambda.effect.io.Interpreter;
-import com.jnape.palatable.lambda.effect.io.interpreter.RecursiveCase.Inductive;
-import com.jnape.palatable.lambda.effect.io.interpreter.RecursiveCase.Terminal;
+import com.jnape.palatable.lambda.effect.io.interpreter.TailExpr.Recur;
+import com.jnape.palatable.lambda.effect.io.interpreter.TailExpr.Return;
 import com.jnape.palatable.lambda.functions.Fn0;
 import com.jnape.palatable.lambda.functions.Fn1;
 import com.jnape.palatable.lambda.internal.Runtime;
@@ -11,45 +11,37 @@ import com.jnape.palatable.lambda.effect.io.Callback;
 
 import static com.jnape.palatable.lambda.effect.io.IO.io;
 
-public final class RunSync<A> implements Interpreter<A, RecursiveCase<IO<A>, A>> {
+//todo: interpret into arrow accepting platform to inject console etc.
+public final class RunSync<A> implements Interpreter<A, TailExpr<IO<A>, A>> {
 
     private static final RunSync<?> INSTANCE = new RunSync<>();
 
     private RunSync() {
     }
 
-    public static <A> A unsafeRunSync(IO<A> io) {
-        RunSync<A>              instance = runSync();
-        RecursiveCase<IO<A>, A> next     = new Inductive<>(io);
-        while (next instanceof Inductive<IO<A>, A> i) {
-            next = i.a().interpret(instance);
-        }
-        return ((Terminal<IO<A>, A>) next).b();
+    @Override
+    public TailExpr<IO<A>, A> interpret(A a) {
+        return new Return<>(a);
     }
 
     @Override
-    public RecursiveCase<IO<A>, A> interpret(A a) {
-        return new Terminal<>(a);
+    public TailExpr<IO<A>, A> interpret(Fn0<? extends A> thunk) {
+        return new Return<>(thunk.apply());
     }
 
     @Override
-    public RecursiveCase<IO<A>, A> interpret(Fn0<? extends A> thunk) {
-        return new Terminal<>(thunk.apply());
+    public TailExpr<IO<A>, A> interpret(Callback<? super Callback<? super A>> k) {
+        return new Return<>(fireAndAwait(k));
     }
 
     @Override
-    public RecursiveCase<IO<A>, A> interpret(Callback<? super Callback<? super A>> k) {
-        return new Terminal<>(fireAndAwait(k));
+    public <Z> TailExpr<IO<A>, A> interpret(IO<Z> ioZ, IO<Fn1<? super Z, ? extends A>> ioF) {
+        return new Recur<>(ioZ.bind(z -> ioF.bind(f -> io(f.apply(z)))));
     }
 
     @Override
-    public <Z> RecursiveCase<IO<A>, A> interpret(IO<Z> ioZ, IO<Fn1<? super Z, ? extends A>> ioF) {
-        return new Inductive<>(ioZ.bind(z -> ioF.bind(f -> io(f.apply(z)))));
-    }
-
-    @Override
-    public <Z> RecursiveCase<IO<A>, A> interpret(IO<Z> ioZ, Fn1<? super Z, ? extends IO<A>> f) {
-        return new Inductive<>(ioZ.interpret(new Phi<>(f)));
+    public <Z> TailExpr<IO<A>, A> interpret(IO<Z> ioZ, Fn1<? super Z, ? extends IO<A>> f) {
+        return new Recur<>(ioZ.interpret(new Phi<>(f)));
     }
 
     private record Phi<Z, A>(
@@ -89,9 +81,11 @@ public final class RunSync<A> implements Interpreter<A, RecursiveCase<IO<A>, A>>
             {
                 synchronized (this) {
                     k.call((Callback<? super A>) a -> {
-                        value    = a;
-                        complete = true;
-                        notify();
+                        synchronized (this) {
+                            value    = a;
+                            complete = true;
+                            notify();
+                        }
                     });
                     while (!complete) {
                         try {

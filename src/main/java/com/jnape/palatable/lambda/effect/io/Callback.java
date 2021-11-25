@@ -10,6 +10,11 @@ public interface Callback<A> extends Fn1<A, Unit> {
 
     void checkedCall(A a) throws Exception;
 
+    @Override
+    default <Z> Callback<Z> contraMap(Fn1<? super Z, ? extends A> fn) {
+        return z -> call(fn.apply(z));
+    }
+
     default void call(A a) {
         try {
             checkedCall(a);
