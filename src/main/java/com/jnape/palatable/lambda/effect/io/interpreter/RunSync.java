@@ -2,14 +2,18 @@ package com.jnape.palatable.lambda.effect.io.interpreter;
 
 import com.jnape.palatable.lambda.effect.io.IO;
 import com.jnape.palatable.lambda.effect.io.Interpreter;
+import com.jnape.palatable.lambda.effect.io.fiber.FiberResult;
+import com.jnape.palatable.lambda.effect.io.fiber.FiberResult.Cancelled;
+import com.jnape.palatable.lambda.effect.io.fiber.FiberResult.Failure;
 import com.jnape.palatable.lambda.effect.io.interpreter.TailExpr.Recur;
 import com.jnape.palatable.lambda.effect.io.interpreter.TailExpr.Return;
-import com.jnape.palatable.lambda.functions.Fn0;
 import com.jnape.palatable.lambda.functions.Fn1;
-import com.jnape.palatable.lambda.internal.Runtime;
-import com.jnape.palatable.lambda.effect.io.Callback;
+
+import java.util.concurrent.CancellationException;
+import java.util.function.Consumer;
 
 import static com.jnape.palatable.lambda.effect.io.IO.io;
+import static com.jnape.palatable.lambda.internal.Runtime.throwChecked;
 
 //todo: interpret into arrow accepting platform to inject console etc.
 public final class RunSync<A> implements Interpreter<A, TailExpr<IO<A>, A>> {
@@ -25,12 +29,7 @@ public final class RunSync<A> implements Interpreter<A, TailExpr<IO<A>, A>> {
     }
 
     @Override
-    public TailExpr<IO<A>, A> interpret(Fn0<? extends A> thunk) {
-        return new Return<>(thunk.apply());
-    }
-
-    @Override
-    public TailExpr<IO<A>, A> interpret(Callback<? super Callback<? super A>> k) {
+    public TailExpr<IO<A>, A> interpret(Consumer<? super Consumer<? super FiberResult<A>>> k) {
         return new Return<>(fireAndAwait(k));
     }
 
@@ -53,12 +52,7 @@ public final class RunSync<A> implements Interpreter<A, TailExpr<IO<A>, A>> {
         }
 
         @Override
-        public IO<A> interpret(Fn0<? extends Z> thunk) {
-            return f.apply(thunk.apply());
-        }
-
-        @Override
-        public IO<A> interpret(Callback<? super Callback<? super Z>> k) {
+        public IO<A> interpret(Consumer<? super Consumer<? super FiberResult<Z>>> k) {
             return f.apply(fireAndAwait(k));
         }
 
@@ -73,16 +67,16 @@ public final class RunSync<A> implements Interpreter<A, TailExpr<IO<A>, A>> {
         }
     }
 
-    private static <A> A fireAndAwait(Callback<? super Callback<? super A>> k) {
-        return new Object() {
-            volatile A value;
+    private static <A> A fireAndAwait(Consumer<? super Consumer<? super FiberResult<A>>> k) {
+        FiberResult<A> result = new Object() {
+            volatile FiberResult<A> value;
             volatile boolean complete = false;
 
             {
                 synchronized (this) {
-                    k.call((Callback<? super A>) a -> {
+                    k.accept((Consumer<? super FiberResult<A>>) resA -> {
                         synchronized (this) {
-                            value    = a;
+                            value    = resA;
                             complete = true;
                             notify();
                         }
@@ -91,12 +85,18 @@ public final class RunSync<A> implements Interpreter<A, TailExpr<IO<A>, A>> {
                         try {
                             wait();
                         } catch (InterruptedException e) {
-                            throw Runtime.throwChecked(e);
+                            throw throwChecked(e);
                         }
                     }
                 }
             }
         }.value;
+
+        if (result instanceof Cancelled<?>)
+            throw new CancellationException();
+        else if (result instanceof Failure<?> failure)
+            throw throwChecked(failure.ex());
+        return ((FiberResult.Success<A>) result).result();
     }
 
     @SuppressWarnings("unchecked")

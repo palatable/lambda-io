@@ -199,25 +199,4 @@ public interface Fiber<A> {
     static <A> Fiber<A> never() {
         return (s, c, k) -> {};
     }
-
-    static void main(String[] args) {
-        Fiber<Unit> cleanup = Fiber.<Unit>fiber((s, c, k) -> {
-            System.out.println("done");
-            Scheduler.shared().shutdown();
-            k.call(new Success<>(UNIT));
-        });
-        Fiber<Collection<Integer>> par = parallel(Fiber.success(1).suspend(Fiber.delay(Duration.ofSeconds(1)).map(constantly(0))),
-                                                  Fiber.success(2));
-
-        int            i   = 0;
-        Fiber<Integer> fib = Fiber.success(1);
-        while (i++ < 10_000)
-            fib = fib.bind(x -> Fiber.success(x + 1));
-
-
-        fib
-                .call(Scheduler.shared(), Cancel.root(), System.out::println);
-
-
-    }
 }

@@ -15,7 +15,7 @@ public interface Scheduler extends Executor {
 
     final class Shared implements Scheduler {
         private static final Shared INSTANCE = new Shared(
-                getRuntime().availableProcessors(),
+                1,
                 new ThreadFactory() {
                     private final AtomicLong counter = new AtomicLong(1);
 
