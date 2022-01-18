@@ -1,10 +1,10 @@
 package com.jnape.palatable.lambda.effect.io;
 
 import com.jnape.palatable.lambda.adt.Unit;
-import com.jnape.palatable.lambda.effect.io.fiber.FiberResult;
-import com.jnape.palatable.lambda.effect.io.fiber.FiberResult.Cancelled;
-import com.jnape.palatable.lambda.effect.io.fiber.FiberResult.Failure;
-import com.jnape.palatable.lambda.effect.io.fiber.Scheduler;
+import com.jnape.palatable.lambda.effect.io.fiber2.old.FiberResult;
+import com.jnape.palatable.lambda.effect.io.fiber2.old.FiberResult.Cancelled;
+import com.jnape.palatable.lambda.effect.io.fiber2.old.FiberResult.Failure;
+import com.jnape.palatable.lambda.effect.io.fiber2.old.Scheduler;
 import com.jnape.palatable.lambda.effect.io.interpreter.TailExpr;
 import com.jnape.palatable.lambda.effect.io.interpreter.TailExpr.Recur;
 

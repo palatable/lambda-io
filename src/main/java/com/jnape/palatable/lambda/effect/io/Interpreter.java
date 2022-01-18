@@ -1,6 +1,6 @@
 package com.jnape.palatable.lambda.effect.io;
 
-import com.jnape.palatable.lambda.effect.io.fiber.FiberResult;
+import com.jnape.palatable.lambda.effect.io.fiber2.old.FiberResult;
 import com.jnape.palatable.lambda.functions.Fn1;
 
 import java.util.function.Consumer;

@@ -1,4 +1,4 @@
-package com.jnape.palatable.lambda.effect.io.fiber;
+package com.jnape.palatable.lambda.effect.io.fiber2.old;
 
 import com.jnape.palatable.shoki.impl.HashSet;
 import com.jnape.palatable.shoki.impl.StrictQueue;

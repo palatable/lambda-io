@@ -1,7 +1,7 @@
 package com.jnape.palatable.lambda.effect.io;
 
 import com.jnape.palatable.lambda.adt.Unit;
-import com.jnape.palatable.lambda.effect.io.fiber.FiberResult;
+import com.jnape.palatable.lambda.effect.io.fiber2.old.FiberResult;
 import com.jnape.palatable.lambda.functions.Fn0;
 import com.jnape.palatable.lambda.functions.Fn1;
 import com.jnape.palatable.lambda.functions.specialized.SideEffect;
@@ -10,8 +10,8 @@ import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 
 import static com.jnape.palatable.lambda.adt.Unit.UNIT;
-import static com.jnape.palatable.lambda.effect.io.fiber.FiberResult.failure;
-import static com.jnape.palatable.lambda.effect.io.fiber.FiberResult.success;
+import static com.jnape.palatable.lambda.effect.io.fiber2.old.FiberResult.failure;
+import static com.jnape.palatable.lambda.effect.io.fiber2.old.FiberResult.success;
 
 public sealed interface IO<A> {
 

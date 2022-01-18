@@ -1,4 +1,4 @@
-package com.jnape.palatable.lambda.effect.io.fiber2;
+package com.jnape.palatable.lambda.effect.io.fiber;
 
 final class ExceptionOutsideOfFiber extends FatalFiberError {
     ExceptionOutsideOfFiber(Throwable cause) {

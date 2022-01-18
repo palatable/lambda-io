@@ -3,21 +3,21 @@ package com.jnape.palatable.lambda.effect.io.interpreter;
 import com.jnape.palatable.lambda.adt.Unit;
 import com.jnape.palatable.lambda.effect.io.IO;
 import com.jnape.palatable.lambda.effect.io.Interpreter;
-import com.jnape.palatable.lambda.effect.io.fiber.Cancel;
-import com.jnape.palatable.lambda.effect.io.fiber.FiberCallback;
-import com.jnape.palatable.lambda.effect.io.fiber.FiberResult;
-import com.jnape.palatable.lambda.effect.io.fiber.FiberResult.Cancelled;
-import com.jnape.palatable.lambda.effect.io.fiber.FiberResult.Failure;
-import com.jnape.palatable.lambda.effect.io.fiber.FiberResult.Success;
-import com.jnape.palatable.lambda.effect.io.fiber.Scheduler;
+import com.jnape.palatable.lambda.effect.io.fiber2.old.Cancel;
+import com.jnape.palatable.lambda.effect.io.fiber2.old.FiberCallback;
+import com.jnape.palatable.lambda.effect.io.fiber2.old.FiberResult;
+import com.jnape.palatable.lambda.effect.io.fiber2.old.FiberResult.Cancelled;
+import com.jnape.palatable.lambda.effect.io.fiber2.old.FiberResult.Failure;
+import com.jnape.palatable.lambda.effect.io.fiber2.old.FiberResult.Success;
+import com.jnape.palatable.lambda.effect.io.fiber2.old.Scheduler;
 import com.jnape.palatable.lambda.functions.Fn1;
 
 import java.util.function.Consumer;
 
 import static com.jnape.palatable.lambda.adt.Unit.UNIT;
 import static com.jnape.palatable.lambda.effect.io.IO.io;
-import static com.jnape.palatable.lambda.effect.io.fiber.FiberResult.cancelled;
-import static com.jnape.palatable.lambda.effect.io.fiber.FiberResult.success;
+import static com.jnape.palatable.lambda.effect.io.fiber2.old.FiberResult.cancelled;
+import static com.jnape.palatable.lambda.effect.io.fiber2.old.FiberResult.success;
 
 public final class Fiber<A> implements Interpreter<A, Unit> {
     private final int              currentWorkCount;

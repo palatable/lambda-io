@@ -2,9 +2,9 @@ package com.jnape.palatable.lambda.effect.io.interpreter;
 
 import com.jnape.palatable.lambda.effect.io.IO;
 import com.jnape.palatable.lambda.effect.io.Interpreter;
-import com.jnape.palatable.lambda.effect.io.fiber.FiberResult;
-import com.jnape.palatable.lambda.effect.io.fiber.FiberResult.Cancelled;
-import com.jnape.palatable.lambda.effect.io.fiber.FiberResult.Failure;
+import com.jnape.palatable.lambda.effect.io.fiber2.old.FiberResult;
+import com.jnape.palatable.lambda.effect.io.fiber2.old.FiberResult.Cancelled;
+import com.jnape.palatable.lambda.effect.io.fiber2.old.FiberResult.Failure;
 import com.jnape.palatable.lambda.effect.io.interpreter.TailExpr.Recur;
 import com.jnape.palatable.lambda.effect.io.interpreter.TailExpr.Return;
 import com.jnape.palatable.lambda.functions.Fn1;
