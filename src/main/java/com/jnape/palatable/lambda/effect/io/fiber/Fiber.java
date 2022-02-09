@@ -9,11 +9,10 @@ import com.jnape.palatable.lambda.effect.io.fiber2.old.FiberResult.Cancelled;
 import com.jnape.palatable.lambda.effect.io.fiber2.old.FiberResult.Failure;
 import com.jnape.palatable.lambda.effect.io.fiber2.old.FiberResult.Success;
 import com.jnape.palatable.lambda.effect.io.fiber2.old.Scheduler;
-import com.jnape.palatable.lambda.effect.io.fiber2.scheduler.Trampoline;
-import com.jnape.palatable.lambda.effect.io.shoki.Vector;
 import com.jnape.palatable.lambda.functions.Fn0;
 import com.jnape.palatable.lambda.functions.Fn1;
 import com.jnape.palatable.lambda.functions.specialized.SideEffect;
+import com.jnape.palatable.lambda.runtime.fiber.internal.Array;
 
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -30,8 +29,7 @@ import static com.jnape.palatable.lambda.effect.io.fiber2.old.FiberResult.succes
 
 public interface Fiber<A> {
 
-    Fiber<Unit> NOOP  = value(UNIT);
-    Fiber<?>    NEVER = (s, c, k) -> {};
+    Fiber<?> NEVER = (s, c, k) -> {};
 
     void execute(Scheduler scheduler, Cancel cancel, FiberCallback<A> callback);
 
@@ -44,19 +42,6 @@ public interface Fiber<A> {
     static <A> Fiber<A> fiber(Fn0<? extends A> f) {
         return cancellable((scheduler, callback) -> {
             try {callback.call(success(f.apply()));} catch (Throwable t) {callback.call(failure(t));}
-        });
-    }
-
-    default Fiber<A> recover(Fn1<? super Throwable, ? extends A> catchFn) {
-        return (s, c, k) -> execute(s, c, resA -> k.call(resA instanceof Failure<A> failure
-                                                         ? success(catchFn.apply(failure.ex()))
-                                                         : resA));
-    }
-
-    static Fiber<Unit> value(SideEffect sideEffect) {
-        return fork(() -> {
-            sideEffect.Ω();
-            return UNIT;
         });
     }
 
@@ -112,7 +97,7 @@ public interface Fiber<A> {
     }
 
     @SafeVarargs
-    static <A> Fiber<Vector<A>> parallel(Fiber<A>... fibers) {
+    static <A> Fiber<Array<A>> parallel(Fiber<A>... fibers) {
         return (s, c, k) -> s.schedule(() -> {
             if (c.cancelled()) {
                 k.call(cancelled());
@@ -132,7 +117,11 @@ public interface Fiber<A> {
                                 k.call(cancelled());
                             else if (remaining.decrementAndGet() == 0) {
                                 if (c.cancelled()) k.call(cancelled());
-                                else k.call(success(Vector.wrap(results)));
+                                else {
+                                    @SuppressWarnings("unchecked")
+                                    Array<A> array = (Array<A>) Array.shallowCopy(results);
+                                    k.call(success(array));
+                                }
                             }
                         } else {
                             Failure<A> failure = (Failure<A>) res;
@@ -171,10 +160,6 @@ public interface Fiber<A> {
         return (Fiber<A>) NEVER;
     }
 
-    static <A> Fiber<A> value(A a) {
-        return new Value<>(a);
-    }
-
     static <A> Fiber<A> cancellable(BiConsumer<Scheduler, FiberCallback<A>> task) {
         return (scheduler, cancel, callback) -> {
             if (cancel.cancelled()) {
@@ -189,16 +174,8 @@ public interface Fiber<A> {
     }
 }
 
-record Value<A>(A a) implements Fiber<A> {
-    @Override
-    public void execute(Scheduler scheduler, Cancel cancel, FiberCallback<A> callback) {
-        callback.call(success(a));
-    }
-}
-
 record Bind<Z, A>(Fiber<Z> fiberZ, Fn1<? super Z, ? extends Fiber<A>> f) implements Fiber<A> {
 
-    public static final Scheduler SameThreadTrampoline = Trampoline.trampoline();
 
     interface Eliminator<A> {
         <Z> void apply(Fiber<Z> fiberZ, Fn1<? super Z, ? extends Fiber<A>> f);
