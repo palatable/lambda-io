@@ -1,4 +1,4 @@
-package com.jnape.palatable.lambda.benchmark;
+package com.jnape.palatable.lambda.runtime.fiber.benchmark;
 
 import java.util.concurrent.TimeUnit;
 
@@ -45,7 +45,7 @@ public final class Sample {
         }
     }
 
-    public static Sample sample(String label,long reportModulus, TimeUnit timeUnit) {
+    public static Sample sample(String label, long reportModulus, TimeUnit timeUnit) {
         return new Sample(label, System.nanoTime(), reportModulus, timeUnit, 0);
     }
 }

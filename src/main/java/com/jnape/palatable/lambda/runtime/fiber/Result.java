@@ -3,6 +3,7 @@ package com.jnape.palatable.lambda.runtime.fiber;
 import com.jnape.palatable.lambda.runtime.fiber.Result.Cancelled;
 import com.jnape.palatable.lambda.runtime.fiber.Result.Successful;
 
+@SuppressWarnings("unused")
 public sealed interface Result<A> {
 
     boolean isCancelled();

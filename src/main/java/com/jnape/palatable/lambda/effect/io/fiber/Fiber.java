@@ -33,12 +33,6 @@ public interface Fiber<A> {
 
     void execute(Scheduler scheduler, Cancel cancel, FiberCallback<A> callback);
 
-    static <A> Fiber<A> fork(Fn0<? extends A> f) {
-        return cancellable((scheduler, callback) -> scheduler.schedule(() -> {
-            try {callback.call(success(f.apply()));} catch (Throwable t) {callback.call(failure(t));}
-        }));
-    }
-
     static <A> Fiber<A> fiber(Fn0<? extends A> f) {
         return cancellable((scheduler, callback) -> {
             try {callback.call(success(f.apply()));} catch (Throwable t) {callback.call(failure(t));}
@@ -175,7 +169,6 @@ public interface Fiber<A> {
 }
 
 record Bind<Z, A>(Fiber<Z> fiberZ, Fn1<? super Z, ? extends Fiber<A>> f) implements Fiber<A> {
-
 
     interface Eliminator<A> {
         <Z> void apply(Fiber<Z> fiberZ, Fn1<? super Z, ? extends Fiber<A>> f);

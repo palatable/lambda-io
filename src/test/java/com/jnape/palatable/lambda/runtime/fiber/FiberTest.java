@@ -3,6 +3,7 @@ package com.jnape.palatable.lambda.runtime.fiber;
 import com.jnape.palatable.lambda.adt.Unit;
 import com.jnape.palatable.lambda.functions.Fn1;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -16,8 +17,10 @@ import static com.jnape.palatable.lambda.functions.builtin.fn1.Constantly.consta
 import static com.jnape.palatable.lambda.functions.builtin.fn2.Eq.eq;
 import static com.jnape.palatable.lambda.functions.builtin.fn3.Times.times;
 import static com.jnape.palatable.lambda.functions.builtin.fn4.IfThenElse.ifThenElse;
+import static com.jnape.palatable.lambda.runtime.fiber.Fiber.fiber;
 import static com.jnape.palatable.lambda.runtime.fiber.scheduler.testsupport.ExplodingScheduler.explodingScheduler;
 import static com.jnape.palatable.lambda.runtime.fiber.scheduler.testsupport.SameThreadScheduler.sameThreadScheduler;
+import static com.jnape.palatable.lambda.runtime.fiber.testsupport.Tags.STACK_SAFETY;
 import static com.jnape.palatable.lambda.runtime.fiber.testsupport.matcher.CancelledResultMatcher.isCancelled;
 import static com.jnape.palatable.lambda.runtime.fiber.testsupport.matcher.FailedResultMatcher.failsWith;
 import static com.jnape.palatable.lambda.runtime.fiber.testsupport.matcher.FiberMatcher.whenExecuted;
@@ -55,23 +58,52 @@ public class FiberTest {
         }
     }
 
-    @Test
-    public void successful() {
-        assertThat(Fiber.successful(1), whenExecuted(succeedsWith(1)));
-        assertThat(Fiber.successful(), whenExecuted(succeedsWith(UNIT)));
-        assertSame(Fiber.successful(), Fiber.successful());
+    @Nested
+    public final class Cancelled {
+
+        @Test
+        public void happyPath() {
+            assertThat(Fiber.cancelled(), whenExecuted(isCancelled()));
+        }
+
+        @Test
+        public void singleton() {
+            assertSame(Fiber.cancelled(), Fiber.cancelled());
+        }
+
+        @Test
+        public void ignoresScheduler() {
+            assertThat(Fiber.cancelled(), whenExecuted(explodingScheduler(), isCancelled()));
+        }
     }
 
-    @Test
-    public void failed() {
-        IllegalStateException reason = new IllegalStateException();
-        assertThat(Fiber.failed(reason), whenExecuted(failsWith(reason)));
-    }
+    @Nested
+    public final class Successful {
 
-    @Test
-    public void cancelled() {
-        assertThat(Fiber.cancelled(), whenExecuted(isCancelled()));
-        assertSame(Fiber.cancelled(), Fiber.cancelled());
+        @Test
+        public void happyPath() {
+            assertThat(Fiber.successful(1), whenExecuted(succeedsWith(1)));
+        }
+
+        @Test
+        public void unitConvenience() {
+            assertThat(Fiber.successful(), whenExecuted(succeedsWith(UNIT)));
+        }
+
+        @Test
+        public void unitSingleton() {
+            assertSame(Fiber.successful(), Fiber.successful());
+        }
+
+        @Test
+        public void singleton() {
+            assertSame(Fiber.cancelled(), Fiber.cancelled());
+        }
+
+        @Test
+        public void ignoresScheduler() {
+            assertThat(Fiber.cancelled(), whenExecuted(explodingScheduler(), isCancelled()));
+        }
     }
 
     @Test
@@ -100,7 +132,7 @@ public class FiberTest {
 
         Canceller canceller = Canceller.root();
         canceller.cancel();
-        assertThat(Fiber.withCancellation((s, c, k) -> fail("Expected fiber not to have been executed, but it was.")),
+        assertThat(Fiber.withCancellation(fiber(() -> fail("Expected fiber not to have been executed, but it was."))),
                    whenExecuted(canceller, isCancelled()));
     }
 
@@ -129,6 +161,7 @@ public class FiberTest {
     }
 
     @Nested
+    @Tag(STACK_SAFETY)
     public final class BindStackSafety {
 
         @Test
