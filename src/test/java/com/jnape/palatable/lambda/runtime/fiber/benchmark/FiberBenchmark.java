@@ -1,6 +1,5 @@
 package com.jnape.palatable.lambda.runtime.fiber.benchmark;
 
-import com.jnape.palatable.lambda.effect.io.fiber2.old.Cancel;
 import com.jnape.palatable.lambda.effect.io.fiber2.old.Scheduler;
 import com.jnape.palatable.lambda.runtime.fiber.Canceller;
 import com.jnape.palatable.lambda.runtime.fiber.Fiber;
@@ -26,7 +25,7 @@ public class FiberBenchmark {
         public static void main(String[] args) {
             Scheduler scheduler = com.jnape.palatable.lambda.effect.io.fiber2.scheduler.Trampoline.trampoline();
             com.jnape.palatable.lambda.effect.io.fiber.Fiber.forever(com.jnape.palatable.lambda.effect.io.fiber.Fiber.fiber(SAMPLE::mark))
-                    .execute(scheduler, Cancel.root(), null);
+                    .execute(scheduler, Canceller.root(), System.out::println);
         }
     }
 

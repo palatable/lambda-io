@@ -2,17 +2,14 @@ package com.jnape.palatable.lambda.runtime.fiber;
 
 import com.jnape.palatable.lambda.adt.Unit;
 import com.jnape.palatable.lambda.functions.Fn1;
-import com.jnape.palatable.lambda.runtime.fiber.internal.Array;
 
 import java.time.Duration;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import static com.jnape.palatable.lambda.adt.Unit.UNIT;
-import static com.jnape.palatable.lambda.runtime.fiber.Successful.SUCCESS_UNIT;
 
-public sealed interface Fiber<A> {
+public interface Fiber<A> {
 
     void execute(Scheduler scheduler, Canceller canceller, Consumer<? super Result<A>> callback);
 
@@ -21,30 +18,30 @@ public sealed interface Fiber<A> {
     }
 
     static <A> Fiber<A> fiber(BiConsumer<? super Canceller, ? super Consumer<? super Result<A>>> k) {
-        return new Continuation<>(k);
+        return (s, c, k_) -> k.accept(c, k_);
     }
 
     static Fiber<Unit> fiber(Runnable r) {
-        return fiber((__, k) -> {
+        return (s, c, k) -> {
             r.run();
             k.accept(Result.successful(UNIT));
-        });
+        };
     }
 
     static Fiber<Unit> successful() {
-        return SUCCESS_UNIT;
+        return successful(UNIT);
     }
 
     static <A> Fiber<A> successful(A a) {
-        return new Successful<>(a);
+        return (s, c, k) -> k.accept(Result.successful(a));
     }
 
     static <A> Fiber<A> failed(Throwable reason) {
-        return new Failed<>(reason);
+        return (s, c, k) -> k.accept(Result.failed(reason));
     }
 
     static Fiber<Unit> park(Duration duration) {
-        return new Park(duration);
+        return (s, c, k) -> s.schedule(duration, () -> k.accept(Result.successful(UNIT)), c);
     }
 
     @SuppressWarnings("unchecked")
@@ -58,36 +55,16 @@ public sealed interface Fiber<A> {
     }
 
     static <A> Fiber<A> withCancellation(Fiber<A> fiber) {
-        return new WithCancellation<>(fiber);
+        return (scheduler, canceller, callback) -> {
+            if (canceller.cancelled())
+                callback.accept(Result.cancelled());
+            else
+                fiber.execute(scheduler, canceller, callback);
+        };
     }
 
     default <B> Fiber<B> bind(Fn1<? super A, ? extends Fiber<B>> f) {
         return new Bind<>(this, f);
-    }
-
-    @SafeVarargs
-    static <A> Fiber<Array<A>> parallel(Fiber<A>... fibers) {
-        return fibers.length == 0 ? Parallel.empty() : new Parallel<A>(fibers);
-    }
-
-    static <A> Fiber<A> fork(Fiber<A> fiber) {
-        return new Fork<>(fiber);
-    }
-
-}
-
-record Forever<A>(Fiber<?> fiber) implements Fiber<A> {
-    @Override
-    public void execute(Scheduler scheduler, Canceller canceller, Consumer<? super Result<A>> callback) {
-        scheduler.schedule(() -> fiber.execute(scheduler, canceller, res -> {
-            if (res.isCancelled())
-                callback.accept(Result.cancelled());
-            else if (res instanceof Failure<?> failure) {
-                callback.accept(failure.contort());
-            } else {
-                execute(scheduler, canceller, callback);
-            }
-        }));
     }
 }
 
@@ -105,40 +82,6 @@ final class Cancelled<A> implements Fiber<A> {
     @Override
     public void execute(Scheduler scheduler, Canceller canceller, Consumer<? super Result<A>> callback) {
         callback.accept(Result.cancelled());
-    }
-}
-
-record Failed<A>(Throwable reason) implements Fiber<A> {
-    @Override
-    public void execute(Scheduler scheduler, Canceller canceller, Consumer<? super Result<A>> callback) {
-        callback.accept(Result.failed(reason));
-    }
-}
-
-record Successful<A>(A a) implements Fiber<A> {
-    static final Successful<Unit> SUCCESS_UNIT = new Successful<>(UNIT);
-
-    @Override
-    public void execute(Scheduler scheduler, Canceller canceller, Consumer<? super Result<A>> callback) {
-        callback.accept(Result.successful(a));
-    }
-}
-
-record Park(Duration duration) implements Fiber<Unit> {
-
-    @Override
-    public void execute(Scheduler scheduler, Canceller canceller, Consumer<? super Result<Unit>> callback) {
-        scheduler.schedule(duration, () -> callback.accept(Result.successful(UNIT)), canceller);
-    }
-}
-
-record WithCancellation<A>(Fiber<A> fiber) implements Fiber<A> {
-    @Override
-    public void execute(Scheduler scheduler, Canceller canceller, Consumer<? super Result<A>> callback) {
-        if (canceller.cancelled())
-            callback.accept(Result.cancelled());
-        else
-            fiber.execute(scheduler, canceller, callback);
     }
 }
 
@@ -200,63 +143,5 @@ record Bind<Z, A>(Fiber<Z> fiberZ, Fn1<? super Z, ? extends Fiber<A>> f) impleme
                 }
             });
         }
-    }
-}
-
-record Fork<A>(Fiber<A> fiber) implements Fiber<A> {
-    @Override
-    public void execute(Scheduler scheduler, Canceller canceller, Consumer<? super Result<A>> callback) {
-        scheduler.schedule(() -> fiber.execute(scheduler, canceller, callback));
-    }
-}
-
-record Continuation<A>(BiConsumer<? super Canceller, ? super Consumer<? super Result<A>>> k) implements Fiber<A> {
-    @Override
-    public void execute(Scheduler scheduler, Canceller canceller, Consumer<? super Result<A>> callback) {
-        k.accept(canceller, callback);
-    }
-}
-
-record Parallel<A>(Fiber<A>[] fibers) implements Fiber<Array<A>> {
-
-    private static final Fiber<?> EMPTY = Fiber.successful(Array.empty());
-
-    @SuppressWarnings("unchecked")
-    public static <A> Fiber<Array<A>> empty() {
-        return (Fiber<Array<A>>) EMPTY;
-    }
-
-    @Override
-    public void execute(Scheduler scheduler, Canceller canceller, Consumer<? super Result<Array<A>>> callback) {
-        Canceller     shared  = canceller.addChild();
-        Object[]      results = new Object[fibers.length];
-        AtomicInteger counter = new AtomicInteger(fibers.length);
-        Consumer<Integer> schedule = i -> scheduler.schedule(() -> {
-            if (!shared.cancelled())
-                fibers[i].execute(scheduler, shared, res -> {
-                    if (res.isCancelled()) {
-                        if (counter.getAndSet(-1) != -1) {
-                            callback.accept(Result.cancelled());
-                        }
-                    } else if (res instanceof Failure<?> failure) {
-                        if (counter.getAndSet(-1) != -1) {
-                            shared.cancel();
-                            callback.accept(failure.contort());
-                        }
-                    } else {
-                        results[i] = ((Success<A>) res).value();
-                        if (counter.getAndDecrement() == 1) {
-                            @SuppressWarnings("unchecked")
-                            Array<A> array = (Array<A>) Array.shallowCopy(results);
-                            callback.accept(Result.successful(array));
-                        }
-                    }
-                });
-            else if (counter.getAndSet(-1) != -1)
-                callback.accept(Result.cancelled());
-        });
-
-        for (int i = 0; i < fibers.length; i++)
-             schedule.accept(i);
     }
 }

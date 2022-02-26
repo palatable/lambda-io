@@ -6,7 +6,6 @@ import com.jnape.palatable.lambda.runtime.fiber.Scheduler;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class Trampoline implements Scheduler {
     private final ArrayBlockingQueue<Runnable> tasks;
@@ -37,22 +36,19 @@ public final class Trampoline implements Scheduler {
     }
 
     @Override
-    public void schedule(Duration delay, Runnable runnable, Canceller canceller) {
+    public void schedule(Duration delay, Runnable runnable, Canceller canceldler) {
         long scheduled = System.nanoTime() + delay.toNanos();
         if (delay.isZero()) {
             schedule(runnable);
             return;
         }
-        AtomicBoolean cancelled = new AtomicBoolean();
         schedule(new Runnable() {
             @Override
             public void run() {
-                if (!cancelled.get()) {
-                    if (System.nanoTime() > scheduled)
-                        runnable.run();
-                    else
-                        schedule(this);
-                }
+                if (System.nanoTime() > scheduled)
+                    runnable.run();
+                else
+                    schedule(this);
             }
         });
     }

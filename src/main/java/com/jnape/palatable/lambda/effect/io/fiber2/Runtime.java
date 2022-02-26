@@ -1,13 +1,13 @@
 package com.jnape.palatable.lambda.effect.io.fiber2;
 
-import com.jnape.palatable.lambda.effect.io.fiber2.old.Cancel;
 import com.jnape.palatable.lambda.effect.io.fiber2.old.Scheduler;
+import com.jnape.palatable.lambda.runtime.fiber.Canceller;
 
 public interface Runtime {
 
     Scheduler scheduler();
 
-    Cancel cancel();
+    Canceller cancel();
 
     Runtime SHARED_JVM = new Runtime() {
         @Override
@@ -16,8 +16,8 @@ public interface Runtime {
         }
 
         @Override
-        public Cancel cancel() {
-            return Cancel.root();
+        public Canceller cancel() {
+            return Canceller.root();
         }
     };
 }

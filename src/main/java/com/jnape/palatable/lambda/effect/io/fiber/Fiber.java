@@ -2,7 +2,6 @@ package com.jnape.palatable.lambda.effect.io.fiber;
 
 import com.jnape.palatable.lambda.adt.Unit;
 import com.jnape.palatable.lambda.adt.choice.Choice2;
-import com.jnape.palatable.lambda.effect.io.fiber2.old.Cancel;
 import com.jnape.palatable.lambda.effect.io.fiber2.old.FiberCallback;
 import com.jnape.palatable.lambda.effect.io.fiber2.old.FiberResult;
 import com.jnape.palatable.lambda.effect.io.fiber2.old.FiberResult.Cancelled;
@@ -12,6 +11,7 @@ import com.jnape.palatable.lambda.effect.io.fiber2.old.Scheduler;
 import com.jnape.palatable.lambda.functions.Fn0;
 import com.jnape.palatable.lambda.functions.Fn1;
 import com.jnape.palatable.lambda.functions.specialized.SideEffect;
+import com.jnape.palatable.lambda.runtime.fiber.Canceller;
 import com.jnape.palatable.lambda.runtime.fiber.internal.Array;
 
 import java.time.Duration;
@@ -31,7 +31,7 @@ public interface Fiber<A> {
 
     Fiber<?> NEVER = (s, c, k) -> {};
 
-    void execute(Scheduler scheduler, Cancel cancel, FiberCallback<A> callback);
+    void execute(Scheduler scheduler, Canceller cancel, FiberCallback<A> callback);
 
     static <A> Fiber<A> fiber(Fn0<? extends A> f) {
         return cancellable((scheduler, callback) -> {
@@ -65,7 +65,7 @@ public interface Fiber<A> {
                 k.call(cancelled());
             else {
                 AtomicBoolean flag  = new AtomicBoolean(false);
-                Cancel        child = c.addChild();
+                Canceller        child = c.addChild();
                 s.schedule(() -> a.execute(s, child, res -> {
                     if (!flag.getAndSet(true)) {
                         child.cancel();
@@ -97,7 +97,7 @@ public interface Fiber<A> {
                 k.call(cancelled());
             } else {
                 Object[]      results   = new Object[fibers.length];
-                Cancel        shared    = c.addChild();
+                Canceller        shared    = c.addChild();
                 AtomicInteger remaining = new AtomicInteger(fibers.length);
                 for (int i = 0; i < fibers.length; i++) {
                     int finalI = i;
@@ -179,14 +179,14 @@ record Bind<Z, A>(Fiber<Z> fiberZ, Fn1<? super Z, ? extends Fiber<A>> f) impleme
     }
 
     @Override
-    public void execute(Scheduler scheduler, Cancel cancel, FiberCallback<A> callback) {
+    public void execute(Scheduler scheduler, Canceller cancel, FiberCallback<A> callback) {
         tick(this, scheduler, callback, cancel, 1);
     }
 
     private static final int stackFrameTransplantDepth = 512;
 
     public static <Z, A> void tick(Bind<Z, A> bind, Scheduler scheduler, FiberCallback<A> ultimateCallback,
-                                   Cancel cancel, int stackDepth) {
+                                   Canceller cancel, int stackDepth) {
         if (cancel.cancelled()) {
             ultimateCallback.call(cancelled());
             return;
