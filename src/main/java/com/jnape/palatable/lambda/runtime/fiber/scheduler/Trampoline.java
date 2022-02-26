@@ -1,9 +1,7 @@
 package com.jnape.palatable.lambda.runtime.fiber.scheduler;
 
-import com.jnape.palatable.lambda.runtime.fiber.Canceller;
 import com.jnape.palatable.lambda.runtime.fiber.Scheduler;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.concurrent.ArrayBlockingQueue;
 
@@ -33,24 +31,6 @@ public final class Trampoline implements Scheduler {
             }
             running = false;
         }};
-    }
-
-    @Override
-    public void schedule(Duration delay, Runnable runnable, Canceller canceldler) {
-        long scheduled = System.nanoTime() + delay.toNanos();
-        if (delay.isZero()) {
-            schedule(runnable);
-            return;
-        }
-        schedule(new Runnable() {
-            @Override
-            public void run() {
-                if (System.nanoTime() > scheduled)
-                    runnable.run();
-                else
-                    schedule(this);
-            }
-        });
     }
 
     public static Trampoline trampoline() {

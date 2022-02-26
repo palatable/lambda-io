@@ -1,7 +1,10 @@
 package com.jnape.palatable.lambda.runtime.fiber;
 
+import com.jnape.palatable.lambda.adt.Unit;
 import com.jnape.palatable.lambda.runtime.fiber.Result.Cancelled;
 import com.jnape.palatable.lambda.runtime.fiber.Result.Successful;
+
+import static com.jnape.palatable.lambda.adt.Unit.UNIT;
 
 @SuppressWarnings("unused")
 public sealed interface Result<A> {
@@ -55,6 +58,10 @@ public sealed interface Result<A> {
         return new Success<>(value);
     }
 
+    static Successful<Unit> successful() {
+        return Success.SUCCESS_UNIT;
+    }
+
     static <A> Failed<A> failed(Throwable reason) {
         return new Failure<>(reason);
     }
@@ -66,6 +73,7 @@ public sealed interface Result<A> {
 }
 
 record Success<A>(A value) implements Successful<A> {
+    static Success<Unit> SUCCESS_UNIT = new Success<>(UNIT);
 }
 
 record Failure<A>(Throwable reason) implements Result.Failed<A> {
@@ -74,3 +82,4 @@ record Failure<A>(Throwable reason) implements Result.Failed<A> {
 final class Cancellation<A> implements Cancelled<A> {
     static final Cancellation<?> INSTANCE = new Cancellation<>();
 }
+

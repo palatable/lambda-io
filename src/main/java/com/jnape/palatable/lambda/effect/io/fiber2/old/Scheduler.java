@@ -12,7 +12,7 @@ import static java.util.concurrent.Executors.newScheduledThreadPool;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
-public interface Scheduler extends Executor {
+public interface Scheduler {
 
     final class Shared implements Scheduler {
         private static final Shared INSTANCE = new Shared(
@@ -49,11 +49,6 @@ public interface Scheduler extends Executor {
     void schedule(Runnable task);
 
     CancelToken delay(Duration delay, Runnable task);
-
-    @Override
-    default void execute(Runnable command) {
-        schedule(command);
-    }
 
     static Scheduler.Shared shared() {
         return Shared.INSTANCE;

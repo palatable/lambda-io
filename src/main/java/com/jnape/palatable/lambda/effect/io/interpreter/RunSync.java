@@ -96,7 +96,7 @@ public final class RunSync<A> implements Interpreter<A, TailExpr<IO<A>, A>> {
             throw new CancellationException();
         else if (result instanceof Failure<?> failure)
             throw throwChecked(failure.ex());
-        return ((FiberResult.Success<A>) result).result();
+        return ((FiberResult.Success2<A>) result).result();
     }
 
     @SuppressWarnings("unchecked")

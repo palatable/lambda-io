@@ -1,12 +1,9 @@
 package com.jnape.palatable.lambda.runtime.fiber.scheduler.testsupport;
 
-import com.jnape.palatable.lambda.runtime.fiber.Canceller;
 import com.jnape.palatable.lambda.runtime.fiber.Scheduler;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class SameThreadScheduler implements Scheduler {
 
@@ -37,28 +34,6 @@ public final class SameThreadScheduler implements Scheduler {
             }
             running = false;
         }};
-    }
-
-    @Override
-    public void schedule(Duration delay, Runnable runnable, Canceller canceller) {
-        if (delay.isZero()) {
-            if (!canceller.cancelled())
-                schedule(runnable);
-        } else {
-            long          scheduled = System.nanoTime() + delay.toNanos();
-            AtomicBoolean cancelled = new AtomicBoolean();
-            schedule(new Runnable() {
-                @Override
-                public void run() {
-                    if (!cancelled.get()) {
-                        if (System.nanoTime() > scheduled)
-                            runnable.run();
-                        else
-                            schedule(this);
-                    }
-                }
-            });
-        }
     }
 
     public static SameThreadScheduler sameThreadScheduler() {

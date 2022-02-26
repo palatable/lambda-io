@@ -3,7 +3,7 @@ package com.jnape.palatable.lambda.effect.io.fiber2.old;
 public sealed interface FiberResult<A> {
 
     static <A> FiberResult<A> success(A a) {
-        return new Success<>(a);
+        return new Success2<>(a);
     }
 
     @SuppressWarnings("unchecked")
@@ -25,7 +25,7 @@ public sealed interface FiberResult<A> {
         }
     }
 
-    record Success<A>(A result) implements NonCancelledResult<A> {
+    record Success2<A>(A result) implements NonCancelledResult<A> {
 
         @Override
         public String toString() {

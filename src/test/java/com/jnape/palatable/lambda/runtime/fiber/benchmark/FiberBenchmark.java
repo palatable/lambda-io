@@ -23,9 +23,8 @@ public class FiberBenchmark {
 
     public static final class Old {
         public static void main(String[] args) {
-            Scheduler scheduler = com.jnape.palatable.lambda.effect.io.fiber2.scheduler.Trampoline.trampoline();
             com.jnape.palatable.lambda.effect.io.fiber.Fiber.forever(com.jnape.palatable.lambda.effect.io.fiber.Fiber.fiber(SAMPLE::mark))
-                    .execute(scheduler, Canceller.root(), System.out::println);
+                    .execute(trampoline(), Canceller.root(), System.out::println);
         }
     }
 

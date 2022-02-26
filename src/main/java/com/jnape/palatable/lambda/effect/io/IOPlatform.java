@@ -9,7 +9,6 @@ import com.jnape.palatable.lambda.effect.io.interpreter.TailExpr;
 import com.jnape.palatable.lambda.effect.io.interpreter.TailExpr.Recur;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 
 import static com.jnape.palatable.lambda.effect.io.interpreter.RunSyncFiber.runSyncFiber;
@@ -26,7 +25,7 @@ public interface IOPlatform {
                 } else if (resA instanceof Failure<?> failure) {
                     completeExceptionally(failure.ex());
                 } else {
-                    complete(((FiberResult.Success<A>) resA).result());
+                    complete(((FiberResult.Success2<A>) resA).result());
                 }
             });
         }}.join();
@@ -52,7 +51,7 @@ interface Constants {
 
         private static <A> void trampoline(
                 IO<A> io,
-                Executor scheduler,
+                Scheduler scheduler,
                 Interpreter<A, TailExpr<IO<A>, Unit>> interpreter,
                 StackCounter stackCounter) {
             TailExpr<IO<A>, Unit> expr = new Recur<>(io);
@@ -60,7 +59,7 @@ interface Constants {
                 if (stackCounter.x++ < WORK_UNITS_PER_QUANTA)
                     expr = i.a().interpret(interpreter);
                 else {
-                    scheduler.execute(() -> trampoline(i.a(), scheduler, interpreter, stackCounter.reset()));
+                    scheduler.schedule(() -> trampoline(i.a(), scheduler, interpreter, stackCounter.reset()));
                     return;
                 }
             }
@@ -71,13 +70,13 @@ interface Constants {
             trampoline(io, k, Scheduler.shared(), new StackCounter());
         }
 
-        private <A> void trampoline(IO<A> io, Consumer<? super FiberResult<A>> k, Executor executor,
+        private <A> void trampoline(IO<A> io, Consumer<? super FiberResult<A>> k, Scheduler executor,
                                     StackCounter stackCounter) {
             trampoline(io, executor, runSyncFiber(k, (interpreter, next) -> {
                 if (stackCounter.x < WORK_UNITS_PER_QUANTA)
                     trampoline(next, executor, interpreter, stackCounter);
                 else
-                    executor.execute(() -> trampoline(next, executor, interpreter, stackCounter.reset()));
+                    executor.schedule(() -> trampoline(next, executor, interpreter, stackCounter.reset()));
             }), stackCounter);
         }
     };

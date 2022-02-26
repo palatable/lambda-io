@@ -1,9 +1,9 @@
 package com.jnape.palatable.lambda.runtime.fiber;
 
 import com.jnape.palatable.lambda.adt.Unit;
+import com.jnape.palatable.lambda.functions.Fn0;
 import com.jnape.palatable.lambda.functions.Fn1;
 
-import java.time.Duration;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -22,10 +22,18 @@ public interface Fiber<A> {
     }
 
     static Fiber<Unit> fiber(Runnable r) {
-        return (s, c, k) -> {
+        return take2(() -> {
             r.run();
-            k.accept(Result.successful(UNIT));
-        };
+            return UNIT;
+        });
+    }
+
+    static <A> Fiber<A> omg(Consumer<? super Consumer<? super Result<A>>> k) {
+        return (s, c, k2) -> k.accept(k2);
+    }
+
+    static <A> Fiber<A> take2(Fn0<? extends A> fn) {
+        return (s, c, k) -> k.accept(Result.successful(fn.apply()));
     }
 
     static Fiber<Unit> successful() {
@@ -40,9 +48,9 @@ public interface Fiber<A> {
         return (s, c, k) -> k.accept(Result.failed(reason));
     }
 
-    static Fiber<Unit> park(Duration duration) {
-        return (s, c, k) -> s.schedule(duration, () -> k.accept(Result.successful(UNIT)), c);
-    }
+//    static Fiber<Unit> park(Duration duration) {
+//        return (s, c, k) -> s.schedule(duration, () -> k.accept(Result.successful(UNIT)));
+//    }
 
     @SuppressWarnings("unchecked")
     static <A> Fiber<A> cancelled() {
