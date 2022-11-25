@@ -1,23 +1,20 @@
 package com.jnape.palatable.lambda.runtime.fiber;
 
-import com.jnape.palatable.lambda.runtime.fiber.testsupport.matcher.FiberMatcher;
 import org.junit.jupiter.api.Test;
+
+import java.time.Duration;
 
 import static com.jnape.palatable.lambda.adt.Unit.UNIT;
 import static com.jnape.palatable.lambda.runtime.fiber.Result.cancellation;
 import static com.jnape.palatable.lambda.runtime.fiber.Result.failure;
 import static com.jnape.palatable.lambda.runtime.fiber.Result.success;
-import static com.jnape.palatable.lambda.runtime.fiber.testsupport.matcher.FiberMatcher.whenExecuted;
+import static com.jnape.palatable.lambda.runtime.fiber.testsupport.matcher.FiberResultMatcher.yieldsPureResult;
+import static com.jnape.palatable.lambda.runtime.fiber.testsupport.matcher.FiberTimeoutMatcher.timesOutAfter;
 import static org.hamcrest.Matchers.allOf;
-import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.sameInstance;
 import static org.hamcrest.junit.MatcherAssert.assertThat;
 
 public class FiberTest {
-
-    private static final Scheduler THROWING_SCHEDULER = runnable -> {
-        throw new UnsupportedOperationException();
-    };
 
     @Test
     public void result() {
@@ -44,7 +41,8 @@ public class FiberTest {
                                             sameInstance(Fiber.cancelled())));
     }
 
-    private static <A> FiberMatcher<A> yieldsPureResult(Result<? extends A> result) {
-        return whenExecuted(THROWING_SCHEDULER, equalTo(result));
+    @Test
+    public void never() {
+        assertThat(Fiber.never(), timesOutAfter(Duration.ofMillis(50)));
     }
 }
