@@ -1,85 +1,49 @@
 package com.jnape.palatable.lambda.runtime.fiber;
 
 import com.jnape.palatable.lambda.adt.Unit;
-import com.jnape.palatable.lambda.runtime.fiber.Result.Cancelled;
-import com.jnape.palatable.lambda.runtime.fiber.Result.Successful;
 
 import static com.jnape.palatable.lambda.adt.Unit.UNIT;
 
 @SuppressWarnings("unused")
 public sealed interface Result<A> {
 
-    boolean isCancelled();
-
-    sealed interface Successful<A> extends Result<A> {
-        A value();
-
-        @Override
-        default boolean isCancelled() {
-            return false;
-        }
+    record Successful<A>(A value) implements Result<A> {
+        private static final Successful<Unit> SUCCESS_UNIT = new Successful<>(UNIT);
     }
 
-    sealed interface Unsuccessful<A> extends Result<A> {
+    record Failed<A>(Throwable reason) implements Result<A> {
+
         @SuppressWarnings("unchecked")
-        default <B> Unsuccessful<B> contort() {
-            return (Unsuccessful<B>) this;
+        public <B> Failed<B> contort() {
+            return (Failed<B>) this;
         }
     }
 
-    sealed interface Failed<A> extends Unsuccessful<A> {
-        Throwable reason();
+    final class Cancelled<A> implements Result<A> {
+        private static final Cancelled<?> INSTANCE = new Cancelled<>();
 
-        @Override
-        default boolean isCancelled() {
-            return false;
-        }
-
-        @Override
-        default <B> Failed<B> contort() {
-            return (Failed<B>) Unsuccessful.super.contort();
-        }
-    }
-
-    sealed interface Cancelled<A> extends Unsuccessful<A> {
-
-        @Override
-        default boolean isCancelled() {
-            return true;
-        }
-
-        @Override
-        default <B> Cancelled<B> contort() {
-            return (Cancelled<B>) Unsuccessful.super.contort();
+        @SuppressWarnings("unchecked")
+        public <B> Cancelled<B> contort() {
+            return (Cancelled<B>) this;
         }
     }
 
     static <A> Successful<A> successful(A value) {
-        return new Success<>(value);
+        return new Successful<>(value);
     }
 
     static Successful<Unit> successful() {
-        return Success.SUCCESS_UNIT;
+        return Successful.SUCCESS_UNIT;
     }
 
     static <A> Failed<A> failed(Throwable reason) {
-        return new Failure<>(reason);
+        return new Failed<>(reason);
     }
 
     @SuppressWarnings("unchecked")
     static <A> Cancelled<A> cancelled() {
-        return (Cancelled<A>) Cancellation.INSTANCE;
+        return (Cancelled<A>) Cancelled.INSTANCE;
     }
 }
 
-record Success<A>(A value) implements Successful<A> {
-    static Success<Unit> SUCCESS_UNIT = new Success<>(UNIT);
-}
-
-record Failure<A>(Throwable reason) implements Result.Failed<A> {
-}
-
-final class Cancellation<A> implements Cancelled<A> {
-    static final Cancellation<?> INSTANCE = new Cancellation<>();
-}
 

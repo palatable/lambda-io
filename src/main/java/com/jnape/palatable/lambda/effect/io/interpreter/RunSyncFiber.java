@@ -6,7 +6,7 @@ import com.jnape.palatable.lambda.effect.io.Interpreter;
 import com.jnape.palatable.lambda.effect.io.fiber2.old.FiberResult;
 import com.jnape.palatable.lambda.effect.io.fiber2.old.FiberResult.Cancelled;
 import com.jnape.palatable.lambda.effect.io.fiber2.old.FiberResult.Failure;
-import com.jnape.palatable.lambda.effect.io.fiber2.old.FiberResult.Success2;
+import com.jnape.palatable.lambda.effect.io.fiber2.old.FiberResult.Success;
 import com.jnape.palatable.lambda.effect.io.interpreter.TailExpr.Recur;
 import com.jnape.palatable.lambda.effect.io.interpreter.TailExpr.Return;
 import com.jnape.palatable.lambda.functions.Fn1;
@@ -74,7 +74,7 @@ public final class RunSyncFiber<A> implements Interpreter<A, TailExpr<IO<A>, Uni
                 } else if (resZ instanceof Cancelled<Z> cancelled) {
                     terminate.accept(cancelled.contort());
                 } else {
-                    recur.accept(f.apply(((Success2<Z>) resZ).result()));
+                    recur.accept(f.apply(((Success<Z>) resZ).result()));
                 }
             });
             return new Return<>(UNIT);

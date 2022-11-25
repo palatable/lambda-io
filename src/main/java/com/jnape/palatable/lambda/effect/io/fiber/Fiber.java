@@ -2,14 +2,12 @@ package com.jnape.palatable.lambda.effect.io.fiber;
 
 import com.jnape.palatable.lambda.adt.Unit;
 import com.jnape.palatable.lambda.adt.choice.Choice2;
-import com.jnape.palatable.lambda.effect.io.fiber2.old.FiberResult;
-import com.jnape.palatable.lambda.effect.io.fiber2.old.FiberResult.Cancelled;
-import com.jnape.palatable.lambda.effect.io.fiber2.old.FiberResult.Failure;
-import com.jnape.palatable.lambda.effect.io.fiber2.old.FiberResult.Success2;
+import com.jnape.palatable.lambda.effect.io.fiber2.old.FiberCallback;
 import com.jnape.palatable.lambda.functions.Fn0;
 import com.jnape.palatable.lambda.functions.Fn1;
 import com.jnape.palatable.lambda.functions.specialized.SideEffect;
 import com.jnape.palatable.lambda.runtime.fiber.Canceller;
+import com.jnape.palatable.lambda.runtime.fiber.Result;
 import com.jnape.palatable.lambda.runtime.fiber.Scheduler;
 import com.jnape.palatable.lambda.runtime.fiber.internal.Array;
 
@@ -21,18 +19,15 @@ import java.util.function.Consumer;
 import static com.jnape.palatable.lambda.adt.Unit.UNIT;
 import static com.jnape.palatable.lambda.adt.choice.Choice2.a;
 import static com.jnape.palatable.lambda.adt.choice.Choice2.b;
-import static com.jnape.palatable.lambda.effect.io.fiber2.old.FiberResult.cancelled;
-import static com.jnape.palatable.lambda.effect.io.fiber2.old.FiberResult.failure;
-import static com.jnape.palatable.lambda.effect.io.fiber2.old.FiberResult.success;
 
 public interface Fiber<A> {
 
     Fiber<?> NEVER = (s, c, k) -> {};
 
-    void execute(Scheduler scheduler, Canceller cancel, Consumer<FiberResult<A>> callback);
+    void execute(Scheduler scheduler, Canceller cancel, FiberCallback<A> callback);
 
     static <A> Fiber<A> fiber(Fn0<? extends A> f) {
-        return (scheduler, c, callback) -> callback.accept(success(f.apply()));
+        return (scheduler, c, callback) -> callback.accept(Result.successful(f.apply()));
     }
 
     static Fiber<Unit> fiber(SideEffect sideEffect) {
@@ -45,28 +40,28 @@ public interface Fiber<A> {
     static <A, B> Fiber<Choice2<A, B>> race(Fiber<A> a, Fiber<B> b) {
         return (s, c, k) -> {
             if (c.cancelled())
-                k.accept(cancelled());
+                k.accept(Result.cancelled());
             else {
                 AtomicBoolean flag  = new AtomicBoolean(false);
                 Canceller     child = c.addChild();
                 s.schedule(() -> a.execute(s, child, res -> {
                     if (!flag.getAndSet(true)) {
                         child.cancel();
-                        k.accept(c.cancelled() || res instanceof Cancelled<?>
-                                 ? cancelled()
-                                 : res instanceof Success2<A> success
-                                   ? success(a(success.result()))
-                                   : ((Failure<?>) res).contort());
+                        k.accept(c.cancelled() || res instanceof Result.Cancelled<?>
+                                 ? Result.cancelled()
+                                 : res instanceof Result.Successful<A> success
+                                   ? Result.successful(a(success.value()))
+                                   : ((Result.Failed<?>) res).contort());
                     }
                 }));
                 s.schedule(() -> b.execute(s, child, res -> {
                     if (!flag.getAndSet(true)) {
                         child.cancel();
-                        k.accept(c.cancelled() || res instanceof Cancelled<?>
-                                 ? cancelled()
-                                 : res instanceof Success2<B> success
-                                   ? success(b(success.result()))
-                                   : ((Failure<?>) res).contort());
+                        k.accept(c.cancelled() || res instanceof Result.Cancelled<?>
+                                 ? Result.cancelled()
+                                 : res instanceof Result.Successful<B> success
+                                   ? Result.successful(b(success.value()))
+                                   : ((Result.Failed<?>) res).contort());
                     }
                 }));
             }
@@ -77,7 +72,7 @@ public interface Fiber<A> {
     static <A> Fiber<Array<A>> parallel(Fiber<A>... fibers) {
         return (s, c, k) -> s.schedule(() -> {
             if (c.cancelled()) {
-                k.accept(cancelled());
+                k.accept(Result.cancelled());
             } else {
                 Object[]      results   = new Object[fibers.length];
                 Canceller     shared    = c.addChild();
@@ -85,26 +80,26 @@ public interface Fiber<A> {
                 for (int i = 0; i < fibers.length; i++) {
                     int finalI = i;
                     s.schedule(() -> fibers[finalI].execute(s, shared, res -> {
-                        if (res instanceof Cancelled<?> cancelled) {
+                        if (res instanceof Result.Cancelled<?> cancelled) {
                             if (remaining.getAndSet(-1) > 0)
                                 k.accept(cancelled.contort());
-                        } else if (res instanceof Success2<A> success) {
-                            results[finalI] = success.result();
+                        } else if (res instanceof Result.Successful<A> success) {
+                            results[finalI] = success.value();
                             if (c.cancelled() && remaining.getAndSet(-1) > 0)
-                                k.accept(cancelled());
+                                k.accept(Result.cancelled());
                             else if (remaining.decrementAndGet() == 0) {
-                                if (c.cancelled()) k.accept(cancelled());
+                                if (c.cancelled()) k.accept(Result.cancelled());
                                 else {
                                     @SuppressWarnings("unchecked")
                                     Array<A> array = (Array<A>) Array.shallowCopy(results);
-                                    k.accept(success(array));
+                                    k.accept(Result.successful(array));
                                 }
                             }
                         } else {
-                            Failure<A> failure = (Failure<A>) res;
+                            Result.Failed<A> failure = (Result.Failed<A>) res;
                             if (remaining.getAndSet(-1) > 0) {
                                 shared.cancel();
-                                k.accept(c.cancelled() ? cancelled() : failure.contort());
+                                k.accept(c.cancelled() ? Result.cancelled() : failure.contort());
                             }
                         }
                     }));
@@ -114,7 +109,7 @@ public interface Fiber<A> {
     }
 
     static <A> Fiber<A> fail(Throwable t) {
-        return cancellable(c -> c.accept(failure(t)));
+        return cancellable(c -> c.accept(Result.failed(t)));
     }
 
 
@@ -122,7 +117,7 @@ public interface Fiber<A> {
         return new Bind<>(this, f);
     }
 
-    public static <A, B> Fiber<B> forever(Fiber<A> fiber) {
+    static <A, B> Fiber<B> forever(Fiber<A> fiber) {
         return fiber.bind(__ -> forever(fiber));
     }
 
@@ -131,16 +126,16 @@ public interface Fiber<A> {
         return (Fiber<A>) NEVER;
     }
 
-    static <A> Fiber<A> cancellable(BiConsumer<Scheduler, Consumer<FiberResult<A>>> task) {
+    static <A> Fiber<A> cancellable(BiConsumer<Scheduler, FiberCallback<A>> task) {
         return (scheduler, cancel, callback) -> {
             if (cancel.cancelled()) {
-                callback.accept(cancelled());
+                callback.accept(Result.cancelled());
             } else
                 task.accept(scheduler, callback);
         };
     }
 
-    static <A> Fiber<A> cancellable(Consumer<Consumer<FiberResult<A>>> task) {
+    static <A> Fiber<A> cancellable(Consumer<FiberCallback<A>> task) {
         return cancellable((__, callback) -> task.accept(callback));
     }
 }
@@ -156,16 +151,16 @@ record Bind<Z, A>(Fiber<Z> fiberZ, Fn1<? super Z, ? extends Fiber<A>> f) impleme
     }
 
     @Override
-    public void execute(Scheduler scheduler, Canceller cancel, Consumer<FiberResult<A>> callback) {
+    public void execute(Scheduler scheduler, Canceller cancel, FiberCallback<A> callback) {
         tick(this, scheduler, callback, cancel, 1);
     }
 
     private static final int stackFrameTransplantDepth = 512;
 
-    public static <Z, A> void tick(Bind<Z, A> bind, Scheduler scheduler, Consumer<FiberResult<A>> ultimateCallback,
+    public static <Z, A> void tick(Bind<Z, A> bind, Scheduler scheduler, FiberCallback<A> ultimateCallback,
                                    Canceller cancel, int stackDepth) {
         if (cancel.cancelled()) {
-            ultimateCallback.accept(cancelled());
+            ultimateCallback.accept(Result.cancelled());
             return;
         }
         if (bind.fiberZ() instanceof Bind<?, Z> bindZ) {
@@ -182,11 +177,11 @@ record Bind<Z, A>(Fiber<Z> fiberZ, Fn1<? super Z, ? extends Fiber<A>> f) impleme
             });
         } else {
             bind.fiberZ().execute(scheduler, cancel, resultZ -> {
-                if (resultZ instanceof Cancelled<Z> cancelledZ) {
+                if (resultZ instanceof Result.Cancelled<Z> cancelledZ) {
                     ultimateCallback.accept(cancelledZ.contort());
-                } else if (resultZ instanceof Success2<Z> successZ) {
+                } else if (resultZ instanceof Result.Successful<Z> successZ) {
                     try {
-                        Fiber<A> fiberA = bind.f().apply(successZ.result());
+                        Fiber<A> fiberA = bind.f().apply(successZ.value());
                         if (fiberA instanceof Bind<?, A> bindA) {
                             if (stackDepth == stackFrameTransplantDepth)
                                 scheduler.schedule(() -> bindA.execute(scheduler, cancel, ultimateCallback));
@@ -200,10 +195,10 @@ record Bind<Z, A>(Fiber<Z> fiberZ, Fn1<? super Z, ? extends Fiber<A>> f) impleme
                                 fiberA.execute(scheduler, cancel, ultimateCallback);
                         }
                     } catch (Throwable t) {
-                        ultimateCallback.accept(failure(new ExceptionOutsideOfFiber(t)));
+                        ultimateCallback.accept(Result.failed(new ExceptionOutsideOfFiber(t)));
                     }
                 } else {
-                    ultimateCallback.accept(((Failure<Z>) resultZ).contort());
+                    ultimateCallback.accept(((Result.Failed<Z>) resultZ).contort());
                 }
             });
         }

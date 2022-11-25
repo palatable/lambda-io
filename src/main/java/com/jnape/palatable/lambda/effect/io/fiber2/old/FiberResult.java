@@ -1,9 +1,10 @@
 package com.jnape.palatable.lambda.effect.io.fiber2.old;
 
+@SuppressWarnings("unused")
 public sealed interface FiberResult<A> {
 
     static <A> FiberResult<A> success(A a) {
-        return new Success2<>(a);
+        return new Success<>(a);
     }
 
     @SuppressWarnings("unchecked")
@@ -25,13 +26,11 @@ public sealed interface FiberResult<A> {
         }
     }
 
-    record Success2<A>(A result) implements NonCancelledResult<A> {
+    record Success<A>(A result) implements NonCancelledResult<A> {
 
         @Override
         public String toString() {
-            return "FiberResult[Success{" +
-                    "result=" + result +
-                    "}]";
+            return "FiberResult[Success{" + "result=" + result + "}]";
         }
     }
 
@@ -44,9 +43,7 @@ public sealed interface FiberResult<A> {
 
         @Override
         public String toString() {
-            return "FiberResult[Failure{" +
-                    "ex=" + ex +
-                    "}]";
+            return "FiberResult[Failure{" + "ex=" + ex + "}]";
         }
     }
 

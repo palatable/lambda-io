@@ -1,12 +1,10 @@
 package com.jnape.palatable.lambda.runtime.fiber.benchmark;
 
-import com.jnape.palatable.lambda.effect.io.fiber2.old.Scheduler;
 import com.jnape.palatable.lambda.runtime.fiber.Canceller;
 import com.jnape.palatable.lambda.runtime.fiber.Fiber;
 import com.jnape.palatable.lambda.runtime.fiber.Result;
 
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.function.Consumer;
 
 import static com.jnape.palatable.lambda.runtime.fiber.Fiber.fiber;
@@ -50,16 +48,7 @@ public class FiberBenchmark {
     public static final class Forked_ElasticPool {
         public static void main(String[] args) {
             FOREVER
-                    .execute(scheduledExecutorService(new ScheduledThreadPoolExecutor(0)), Canceller.root(), __ -> {});
-        }
-    }
-
-    public static final class New {
-        public static void main(String[] args) {
-            FOREVER
-                    .execute(scheduledExecutorService(Executors.newSingleThreadScheduledExecutor()),
-                             Canceller.root(),
-                             __ -> {});
+                    .execute(scheduledExecutorService(Executors.newScheduledThreadPool(0)), Canceller.root(), __ -> {});
         }
     }
 }

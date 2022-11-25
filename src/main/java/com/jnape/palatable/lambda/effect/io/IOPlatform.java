@@ -25,7 +25,7 @@ public interface IOPlatform {
                 } else if (resA instanceof Failure<?> failure) {
                     completeExceptionally(failure.ex());
                 } else {
-                    complete(((FiberResult.Success2<A>) resA).result());
+                    complete(((FiberResult.Success<A>) resA).result());
                 }
             });
         }}.join();

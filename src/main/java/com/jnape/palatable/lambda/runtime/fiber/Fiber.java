@@ -3,6 +3,7 @@ package com.jnape.palatable.lambda.runtime.fiber;
 import com.jnape.palatable.lambda.adt.Unit;
 import com.jnape.palatable.lambda.functions.Fn0;
 import com.jnape.palatable.lambda.functions.Fn1;
+import com.jnape.palatable.lambda.runtime.fiber.Result.Successful;
 
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -132,7 +133,7 @@ record Bind<Z, A>(Fiber<Z> fiberZ, Fn1<? super Z, ? extends Fiber<A>> f) impleme
             bind.fiberZ().execute(scheduler, canceller, resultZ -> {
                 if (resultZ instanceof Result.Cancelled<Z> cancelledZ) {
                     ultimateCallback.accept(cancelledZ.contort());
-                } else if (resultZ instanceof Success<Z> successZ) {
+                } else if (resultZ instanceof Successful<Z> successZ) {
                     Fiber<A> fiberA = bind.f().apply(successZ.value());
                     if (fiberA instanceof Bind<?, A> bindA) {
                         if (stackDepth == stackFrameTransplantDepth)
@@ -147,7 +148,7 @@ record Bind<Z, A>(Fiber<Z> fiberZ, Fn1<? super Z, ? extends Fiber<A>> f) impleme
                             fiberA.execute(scheduler, canceller, ultimateCallback);
                     }
                 } else {
-                    ultimateCallback.accept(((Failure<Z>) resultZ).contort());
+                    ultimateCallback.accept(((Result.Failed<Z>) resultZ).contort());
                 }
             });
         }
