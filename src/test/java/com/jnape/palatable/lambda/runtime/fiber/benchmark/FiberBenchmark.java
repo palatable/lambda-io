@@ -1,14 +1,14 @@
 package com.jnape.palatable.lambda.runtime.fiber.benchmark;
 
+import com.jnape.palatable.lambda.effect.io.fiber.Fiber;
 import com.jnape.palatable.lambda.runtime.fiber.Canceller;
-import com.jnape.palatable.lambda.runtime.fiber.WeirdFiber;
 import com.jnape.palatable.lambda.runtime.fiber.Result;
 
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
-import static com.jnape.palatable.lambda.runtime.fiber.WeirdFiber.fiber;
-import static com.jnape.palatable.lambda.runtime.fiber.WeirdFiber.forever;
+import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.fiber;
+import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.forever;
 import static com.jnape.palatable.lambda.runtime.fiber.Scheduler.scheduledExecutorService;
 import static com.jnape.palatable.lambda.runtime.fiber.benchmark.Sample.sample;
 import static com.jnape.palatable.lambda.runtime.fiber.scheduler.Trampoline.trampoline;
@@ -17,17 +17,9 @@ import static java.util.concurrent.TimeUnit.MICROSECONDS;
 public class FiberBenchmark {
     private static final Sample              SAMPLE   = sample("native fiber", 100_000_000L, MICROSECONDS);
     private static final Consumer<Result<?>> CALLBACK = System.out::println;
-    private static final WeirdFiber<Object>  FOREVER  = forever(fiber(SAMPLE::mark));
-
-    public static final class Old {
-        public static void main(String[] args) {
-            com.jnape.palatable.lambda.effect.io.fiber.Fiber.forever(com.jnape.palatable.lambda.effect.io.fiber.Fiber.fiber(SAMPLE::mark))
-                    .execute(trampoline(), Canceller.root(), System.out::println);
-        }
-    }
+    private static final Fiber<Object>       FOREVER  = forever(fiber(SAMPLE::mark));
 
     public static final class Trampolined {
-
         public static void main(String[] args) {
             FOREVER.execute(trampoline(), Canceller.root(), CALLBACK);
         }
@@ -47,8 +39,7 @@ public class FiberBenchmark {
 
     public static final class Forked_ElasticPool {
         public static void main(String[] args) {
-            FOREVER
-                    .execute(scheduledExecutorService(Executors.newScheduledThreadPool(0)), Canceller.root(), __ -> {});
+            FOREVER.execute(scheduledExecutorService(Executors.newScheduledThreadPool(0)), Canceller.root(), __ -> {});
         }
     }
 }

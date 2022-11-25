@@ -2,7 +2,6 @@ package com.jnape.palatable.lambda.effect.io.fiber;
 
 import com.jnape.palatable.lambda.adt.Unit;
 import com.jnape.palatable.lambda.adt.choice.Choice2;
-import com.jnape.palatable.lambda.effect.io.fiber2.old.FiberCallback;
 import com.jnape.palatable.lambda.functions.Fn0;
 import com.jnape.palatable.lambda.functions.Fn1;
 import com.jnape.palatable.lambda.functions.specialized.SideEffect;
@@ -24,7 +23,7 @@ public interface Fiber<A> {
 
     Fiber<?> NEVER = (s, c, k) -> {};
 
-    void execute(Scheduler scheduler, Canceller cancel, FiberCallback<A> callback);
+    void execute(Scheduler scheduler, Canceller cancel, Consumer<? super Result<A>> callback);
 
     static <A> Fiber<A> fiber(Fn0<? extends A> f) {
         return (scheduler, c, callback) -> callback.accept(Result.successful(f.apply()));
@@ -126,7 +125,7 @@ public interface Fiber<A> {
         return (Fiber<A>) NEVER;
     }
 
-    static <A> Fiber<A> cancellable(BiConsumer<Scheduler, FiberCallback<A>> task) {
+    static <A> Fiber<A> cancellable(BiConsumer<? super Scheduler, ? super Consumer<? super Result<A>>> task) {
         return (scheduler, cancel, callback) -> {
             if (cancel.cancelled()) {
                 callback.accept(Result.cancelled());
@@ -135,7 +134,7 @@ public interface Fiber<A> {
         };
     }
 
-    static <A> Fiber<A> cancellable(Consumer<FiberCallback<A>> task) {
+    static <A> Fiber<A> cancellable(Consumer<? super Consumer<? super Result<A>>> task) {
         return cancellable((__, callback) -> task.accept(callback));
     }
 }
@@ -151,13 +150,13 @@ record Bind<Z, A>(Fiber<Z> fiberZ, Fn1<? super Z, ? extends Fiber<A>> f) impleme
     }
 
     @Override
-    public void execute(Scheduler scheduler, Canceller cancel, FiberCallback<A> callback) {
+    public void execute(Scheduler scheduler, Canceller cancel, Consumer<? super Result<A>> callback) {
         tick(this, scheduler, callback, cancel, 1);
     }
 
     private static final int stackFrameTransplantDepth = 512;
 
-    public static <Z, A> void tick(Bind<Z, A> bind, Scheduler scheduler, FiberCallback<A> ultimateCallback,
+    public static <Z, A> void tick(Bind<Z, A> bind, Scheduler scheduler, Consumer<? super Result<A>> ultimateCallback,
                                    Canceller cancel, int stackDepth) {
         if (cancel.cancelled()) {
             ultimateCallback.accept(Result.cancelled());
