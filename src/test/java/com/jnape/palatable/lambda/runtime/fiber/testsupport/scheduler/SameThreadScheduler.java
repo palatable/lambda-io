@@ -1,4 +1,4 @@
-package research.fiber.scheduler.testsupport;
+package com.jnape.palatable.lambda.runtime.fiber.testsupport.scheduler;
 
 import com.jnape.palatable.lambda.runtime.fiber.Scheduler;
 

@@ -2,7 +2,7 @@ package research.fiber.benchmark;
 
 import research.lambda.effect.io.fiber.Fiber;
 import research.lambda.runtime.fiber.Canceller;
-import research.lambda.runtime.fiber.Result;
+import com.jnape.palatable.lambda.runtime.fiber.Result;
 
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;

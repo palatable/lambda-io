@@ -1,8 +1,8 @@
 package research.fiber.testsupport.matcher;
 
-import research.lambda.runtime.fiber.Result;
-import research.lambda.runtime.fiber.Result.Failure;
-import research.lambda.runtime.fiber.Result.Success;
+import com.jnape.palatable.lambda.runtime.fiber.Result;
+import com.jnape.palatable.lambda.runtime.fiber.Result.Failure;
+import com.jnape.palatable.lambda.runtime.fiber.Result.Success;
 import org.hamcrest.Description;
 import org.hamcrest.Matcher;
 import org.hamcrest.TypeSafeDiagnosingMatcher;

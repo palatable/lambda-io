@@ -6,7 +6,7 @@ import com.jnape.palatable.lambda.functions.Fn0;
 import com.jnape.palatable.lambda.functions.Fn1;
 import com.jnape.palatable.lambda.functions.specialized.SideEffect;
 import research.lambda.runtime.fiber.Canceller;
-import research.lambda.runtime.fiber.Result;
+import com.jnape.palatable.lambda.runtime.fiber.Result;
 import com.jnape.palatable.lambda.runtime.fiber.Scheduler;
 import research.lambda.runtime.fiber.internal.Array;
 
