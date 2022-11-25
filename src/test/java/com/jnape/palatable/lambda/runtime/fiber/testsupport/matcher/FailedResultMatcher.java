@@ -1,8 +1,8 @@
 package com.jnape.palatable.lambda.runtime.fiber.testsupport.matcher;
 
 import com.jnape.palatable.lambda.runtime.fiber.Result;
-import com.jnape.palatable.lambda.runtime.fiber.Result.Failed;
-import com.jnape.palatable.lambda.runtime.fiber.Result.Successful;
+import com.jnape.palatable.lambda.runtime.fiber.Result.Failure;
+import com.jnape.palatable.lambda.runtime.fiber.Result.Success;
 import org.hamcrest.Description;
 import org.hamcrest.Matcher;
 import org.hamcrest.TypeSafeDiagnosingMatcher;
@@ -20,13 +20,13 @@ public final class FailedResultMatcher<A> extends TypeSafeDiagnosingMatcher<Resu
 
     @Override
     protected boolean matchesSafely(Result<A> result, Description description) {
-        if (result instanceof Failed<?> failed) {
-            Throwable reason = failed.reason();
+        if (result instanceof Failure<?> failure) {
+            Throwable reason = failure.reason();
             delegate.describeMismatch(reason, description.appendText("failure reason "));
             return delegate.matches(reason);
         }
 
-        if (result instanceof Successful<A> success) {
+        if (result instanceof Success<A> success) {
             delegate.describeMismatch(success.value(), description.appendText("successful result "));
         } else {
             description.appendText("was cancelled");

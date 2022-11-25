@@ -7,42 +7,40 @@ import static com.jnape.palatable.lambda.adt.Unit.UNIT;
 @SuppressWarnings("unused")
 public sealed interface Result<A> {
 
-    record Successful<A>(A value) implements Result<A> {
-        private static final Successful<Unit> SUCCESS_UNIT = new Successful<>(UNIT);
+    record Success<A>(A value) implements Result<A> {
+        private static final Success<Unit> SUCCESS_UNIT = new Success<>(UNIT);
     }
 
-    record Failed<A>(Throwable reason) implements Result<A> {
+    record Failure<A>(Throwable reason) implements Result<A> {
 
         @SuppressWarnings("unchecked")
-        public <B> Failed<B> contort() {
-            return (Failed<B>) this;
+        public <B> Failure<B> contort() {
+            return (Failure<B>) this;
         }
     }
 
-    final class Cancelled<A> implements Result<A> {
-        private static final Cancelled<?> INSTANCE = new Cancelled<>();
+    final class Cancellation<A> implements Result<A> {
+        private static final Cancellation<?> INSTANCE = new Cancellation<>();
 
-        @SuppressWarnings("unchecked")
-        public <B> Cancelled<B> contort() {
-            return (Cancelled<B>) this;
+        private Cancellation() {
         }
     }
 
-    static <A> Successful<A> successful(A value) {
-        return new Successful<>(value);
+    static <A> Success<A> success(A value) {
+        return new Success<>(value);
     }
 
-    static Successful<Unit> successful() {
-        return Successful.SUCCESS_UNIT;
+    static Success<Unit> success() {
+        return Success.SUCCESS_UNIT;
     }
 
-    static <A> Failed<A> failed(Throwable reason) {
-        return new Failed<>(reason);
+    static <A> Failure<A> failure(Throwable reason) {
+        return new Failure<>(reason);
     }
 
     @SuppressWarnings("unchecked")
-    static <A> Cancelled<A> cancelled() {
-        return (Cancelled<A>) Cancelled.INSTANCE;
+    static <A> Cancellation<A> cancellation() {
+        return (Cancellation<A>) Cancellation.INSTANCE;
     }
 }
 
