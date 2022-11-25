@@ -15,12 +15,12 @@ public interface Fiber<A> {
 
     void execute(Scheduler scheduler, Consumer<? super Result<? extends A>> callback);
 
-    static <A> Fiber<A> fiber(Result<? extends A> result) {
+    static <A> Fiber<A> result(Result<? extends A> result) {
         return (scheduler, callback) -> callback.accept(result);
     }
 
     static <A> Fiber<A> succeeded(A a) {
-        return fiber(success(a));
+        return result(success(a));
     }
 
     static Fiber<Unit> succeeded() {
