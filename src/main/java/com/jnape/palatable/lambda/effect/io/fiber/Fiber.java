@@ -79,8 +79,7 @@ public interface Fiber<A> {
                             else if (remaining.decrementAndGet() == 0) {
                                 if (c.cancelled()) k.accept(cancellation());
                                 else {
-                                    @SuppressWarnings("unchecked")
-                                    Array<A> array = (Array<A>) Array.shallowCopy(results);
+                                    @SuppressWarnings("unchecked") Array<A> array = (Array<A>) Array.shallowCopy(results);
                                     k.accept(Result.success(array));
                                 }
                             }
