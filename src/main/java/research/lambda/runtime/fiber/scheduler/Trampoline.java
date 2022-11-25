@@ -1,6 +1,6 @@
 package research.lambda.runtime.fiber.scheduler;
 
-import research.lambda.runtime.fiber.Scheduler;
+import com.jnape.palatable.lambda.runtime.fiber.Scheduler;
 
 import java.util.ArrayList;
 import java.util.concurrent.ArrayBlockingQueue;

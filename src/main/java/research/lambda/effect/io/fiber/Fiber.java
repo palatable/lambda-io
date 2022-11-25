@@ -7,7 +7,7 @@ import com.jnape.palatable.lambda.functions.Fn1;
 import com.jnape.palatable.lambda.functions.specialized.SideEffect;
 import research.lambda.runtime.fiber.Canceller;
 import research.lambda.runtime.fiber.Result;
-import research.lambda.runtime.fiber.Scheduler;
+import com.jnape.palatable.lambda.runtime.fiber.Scheduler;
 import research.lambda.runtime.fiber.internal.Array;
 
 import java.util.concurrent.atomic.AtomicBoolean;

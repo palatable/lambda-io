@@ -1,8 +1,6 @@
-package research.lambda.runtime.fiber;
+package com.jnape.palatable.lambda.runtime.fiber;
 
 import java.util.concurrent.ScheduledExecutorService;
-
-import static java.util.concurrent.Executors.newScheduledThreadPool;
 
 public interface Scheduler {
 
@@ -10,9 +8,5 @@ public interface Scheduler {
 
     static Scheduler scheduledExecutorService(ScheduledExecutorService scheduledExecutorService) {
         return scheduledExecutorService::execute;
-    }
-
-    static Scheduler elastic() {
-        return scheduledExecutorService(newScheduledThreadPool(0));
     }
 }

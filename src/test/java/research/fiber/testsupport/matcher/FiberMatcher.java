@@ -3,7 +3,7 @@ package research.fiber.testsupport.matcher;
 import research.lambda.effect.io.fiber.Fiber;
 import research.lambda.runtime.fiber.Canceller;
 import research.lambda.runtime.fiber.Result;
-import research.lambda.runtime.fiber.Scheduler;
+import com.jnape.palatable.lambda.runtime.fiber.Scheduler;
 import org.hamcrest.Description;
 import org.hamcrest.Matcher;
 import org.hamcrest.TypeSafeDiagnosingMatcher;

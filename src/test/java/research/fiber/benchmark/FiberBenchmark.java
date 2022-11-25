@@ -7,11 +7,11 @@ import research.lambda.runtime.fiber.Result;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
+import static com.jnape.palatable.lambda.runtime.fiber.Scheduler.scheduledExecutorService;
+import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static research.lambda.effect.io.fiber.Fiber.fiber;
 import static research.lambda.effect.io.fiber.Fiber.forever;
-import static research.lambda.runtime.fiber.Scheduler.scheduledExecutorService;
 import static research.lambda.runtime.fiber.scheduler.Trampoline.trampoline;
-import static java.util.concurrent.TimeUnit.MICROSECONDS;
 
 public class FiberBenchmark {
     private static final Sample              SAMPLE   = Sample.sample("native fiber", 100_000_000L, MICROSECONDS);
