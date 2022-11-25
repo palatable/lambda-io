@@ -1,7 +1,7 @@
 package com.jnape.palatable.lambda.runtime.fiber.testsupport.matcher;
 
 import com.jnape.palatable.lambda.runtime.fiber.Canceller;
-import com.jnape.palatable.lambda.runtime.fiber.Fiber;
+import com.jnape.palatable.lambda.runtime.fiber.WeirdFiber;
 import com.jnape.palatable.lambda.runtime.fiber.Result;
 import com.jnape.palatable.lambda.runtime.fiber.Scheduler;
 import org.hamcrest.Description;
@@ -12,7 +12,7 @@ import java.util.concurrent.CompletableFuture;
 
 import static com.jnape.palatable.lambda.runtime.fiber.scheduler.testsupport.SameThreadScheduler.sameThreadScheduler;
 
-public final class FiberMatcher<A> extends TypeSafeDiagnosingMatcher<Fiber<A>> {
+public final class FiberMatcher<A> extends TypeSafeDiagnosingMatcher<WeirdFiber<A>> {
 
     private final Scheduler                  scheduler;
     private final Canceller                  canceller;
@@ -27,7 +27,7 @@ public final class FiberMatcher<A> extends TypeSafeDiagnosingMatcher<Fiber<A>> {
     }
 
     @Override
-    protected boolean matchesSafely(Fiber<A> fiber, Description description) {
+    protected boolean matchesSafely(WeirdFiber<A> fiber, Description description) {
         return new CompletableFuture<Boolean>() {{
             fiber.execute(scheduler, canceller, res -> {
                 description.appendText("fiber ");

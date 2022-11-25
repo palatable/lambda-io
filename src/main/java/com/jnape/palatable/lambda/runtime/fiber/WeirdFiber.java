@@ -10,42 +10,42 @@ import java.util.function.Consumer;
 
 import static com.jnape.palatable.lambda.adt.Unit.UNIT;
 
-public interface Fiber<A> {
+public interface WeirdFiber<A> {
 
     void execute(Scheduler scheduler, Canceller canceller, Consumer<? super Result<A>> callback);
 
-    static <B> Fiber<B> forever(Fiber<?> f) {
+    static <B> WeirdFiber<B> forever(WeirdFiber<?> f) {
         return f.bind(__ -> forever(f));
     }
 
-    static <A> Fiber<A> fiber(BiConsumer<? super Canceller, ? super Consumer<? super Result<A>>> k) {
+    static <A> WeirdFiber<A> fiber(BiConsumer<? super Canceller, ? super Consumer<? super Result<A>>> k) {
         return (s, c, k_) -> k.accept(c, k_);
     }
 
-    static Fiber<Unit> fiber(Runnable r) {
+    static WeirdFiber<Unit> fiber(Runnable r) {
         return take2(() -> {
             r.run();
             return UNIT;
         });
     }
 
-    static <A> Fiber<A> omg(Consumer<? super Consumer<? super Result<A>>> k) {
+    static <A> WeirdFiber<A> result(Consumer<? super Consumer<? super Result<A>>> k) {
         return (s, c, k2) -> k.accept(k2);
     }
 
-    static <A> Fiber<A> take2(Fn0<? extends A> fn) {
+    static <A> WeirdFiber<A> take2(Fn0<? extends A> fn) {
         return (s, c, k) -> k.accept(Result.successful(fn.apply()));
     }
 
-    static Fiber<Unit> successful() {
+    static WeirdFiber<Unit> successful() {
         return successful(UNIT);
     }
 
-    static <A> Fiber<A> successful(A a) {
+    static <A> WeirdFiber<A> successful(A a) {
         return (s, c, k) -> k.accept(Result.successful(a));
     }
 
-    static <A> Fiber<A> failed(Throwable reason) {
+    static <A> WeirdFiber<A> failed(Throwable reason) {
         return (s, c, k) -> k.accept(Result.failed(reason));
     }
 
@@ -54,16 +54,16 @@ public interface Fiber<A> {
 //    }
 
     @SuppressWarnings("unchecked")
-    static <A> Fiber<A> cancelled() {
-        return (Fiber<A>) Cancelled.INSTANCE;
+    static <A> WeirdFiber<A> cancelled() {
+        return (WeirdFiber<A>) Cancelled.INSTANCE;
     }
 
     @SuppressWarnings("unchecked")
-    static <A> Fiber<A> never() {
-        return (Fiber<A>) Never.INSTANCE;
+    static <A> WeirdFiber<A> never() {
+        return (WeirdFiber<A>) Never.INSTANCE;
     }
 
-    static <A> Fiber<A> withCancellation(Fiber<A> fiber) {
+    static <A> WeirdFiber<A> withCancellation(WeirdFiber<A> fiber) {
         return (scheduler, canceller, callback) -> {
             if (canceller.cancelled())
                 callback.accept(Result.cancelled());
@@ -72,12 +72,12 @@ public interface Fiber<A> {
         };
     }
 
-    default <B> Fiber<B> bind(Fn1<? super A, ? extends Fiber<B>> f) {
+    default <B> WeirdFiber<B> bind(Fn1<? super A, ? extends WeirdFiber<B>> f) {
         return new Bind<>(this, f);
     }
 }
 
-final class Never<A> implements Fiber<A> {
+final class Never<A> implements WeirdFiber<A> {
     static final Never<?> INSTANCE = new Never<>();
 
     @Override
@@ -85,7 +85,7 @@ final class Never<A> implements Fiber<A> {
     }
 }
 
-final class Cancelled<A> implements Fiber<A> {
+final class Cancelled<A> implements WeirdFiber<A> {
     static final Cancelled<?> INSTANCE = new Cancelled<>();
 
     @Override
@@ -94,10 +94,10 @@ final class Cancelled<A> implements Fiber<A> {
     }
 }
 
-record Bind<Z, A>(Fiber<Z> fiberZ, Fn1<? super Z, ? extends Fiber<A>> f) implements Fiber<A> {
+record Bind<Z, A>(WeirdFiber<Z> fiberZ, Fn1<? super Z, ? extends WeirdFiber<A>> f) implements WeirdFiber<A> {
 
     interface Eliminator<A> {
-        <Z> void apply(Fiber<Z> fiberZ, Fn1<? super Z, ? extends Fiber<A>> f);
+        <Z> void apply(WeirdFiber<Z> fiberZ, Fn1<? super Z, ? extends WeirdFiber<A>> f);
     }
 
     void eliminate(Eliminator<A> eliminator) {
@@ -120,7 +120,7 @@ record Bind<Z, A>(Fiber<Z> fiberZ, Fn1<? super Z, ? extends Fiber<A>> f) impleme
         if (bind.fiberZ() instanceof Bind<?, Z> bindZ) {
             bindZ.eliminate(new Eliminator<>() {
                 @Override
-                public <Y> void apply(Fiber<Y> fiberY, Fn1<? super Y, ? extends Fiber<Z>> g) {
+                public <Y> void apply(WeirdFiber<Y> fiberY, Fn1<? super Y, ? extends WeirdFiber<Z>> g) {
                     if (stackDepth == stackFrameTransplantDepth)
                         scheduler.schedule(() -> new Bind<>(fiberY, y -> new Bind<>(g.apply(y), bind.f()))
                                 .execute(scheduler, canceller, ultimateCallback));
@@ -134,7 +134,7 @@ record Bind<Z, A>(Fiber<Z> fiberZ, Fn1<? super Z, ? extends Fiber<A>> f) impleme
                 if (resultZ instanceof Result.Cancelled<Z> cancelledZ) {
                     ultimateCallback.accept(cancelledZ.contort());
                 } else if (resultZ instanceof Successful<Z> successZ) {
-                    Fiber<A> fiberA = bind.f().apply(successZ.value());
+                    WeirdFiber<A> fiberA = bind.f().apply(successZ.value());
                     if (fiberA instanceof Bind<?, A> bindA) {
                         if (stackDepth == stackFrameTransplantDepth)
                             scheduler.schedule(() -> bindA.execute(scheduler, canceller, ultimateCallback));
