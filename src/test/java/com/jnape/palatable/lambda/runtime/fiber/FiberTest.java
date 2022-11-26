@@ -75,7 +75,7 @@ public class FiberTest {
 
         @Test
         public void catchesThrowableFromFunction() {
-            Throwable throwable = new Exception("blew up");
+            RuntimeException throwable = new IllegalStateException("blew up");
             assertThat(fiber(() -> {
                 throw throwable;
             }), yieldsResult(equalTo(failure(throwable))));

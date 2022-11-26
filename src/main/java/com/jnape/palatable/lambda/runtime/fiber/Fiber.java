@@ -1,10 +1,11 @@
 package com.jnape.palatable.lambda.runtime.fiber;
 
 import com.jnape.palatable.lambda.adt.Unit;
-import com.jnape.palatable.lambda.functions.Fn0;
 
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
+import static com.jnape.palatable.lambda.adt.Unit.UNIT;
 import static com.jnape.palatable.lambda.runtime.fiber.Result.cancellation;
 import static com.jnape.palatable.lambda.runtime.fiber.Result.failure;
 import static com.jnape.palatable.lambda.runtime.fiber.Result.success;
@@ -37,8 +38,15 @@ public sealed interface Fiber<A> {
         return Never.instance();
     }
 
-    static <A> Fiber<A> fiber(Fn0<? extends A> fn) {
-        return new Suspension<>(fn);
+    static <A> Fiber<A> fiber(Supplier<? extends A> task) {
+        return new Suspension<>(task);
+    }
+
+    static Fiber<Unit> fiber(Runnable action) {
+        return fiber(() -> {
+            action.run();
+            return UNIT;
+        });
     }
 }
 
@@ -57,7 +65,7 @@ record Value<A>(Result<? extends A> result) implements Fiber<A> {
     }
 }
 
-record Suspension<A>(Fn0<? extends A> fn) implements Fiber<A> {
+record Suspension<A>(Supplier<? extends A> task) implements Fiber<A> {
     @Override
     public void execute(Scheduler scheduler, Canceller canceller, Consumer<? super Result<? extends A>> callback) {
         if (!canceller.cancelled())
@@ -67,7 +75,7 @@ record Suspension<A>(Fn0<? extends A> fn) implements Fiber<A> {
                     result = cancellation();
                 else
                     try {
-                        result = success(fn.apply());
+                        result = success(task.get());
                     } catch (Throwable t) {
                         result = failure(t);
                     }
