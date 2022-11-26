@@ -24,6 +24,7 @@ import static org.hamcrest.junit.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 public class FiberTest {
@@ -40,7 +41,7 @@ public class FiberTest {
         @Test
         public void succeededConvenienceMethods() {
             assertThat(Fiber.succeeded(1), yieldsPureResult(success(1)));
-            assertThat(Fiber.succeeded(), allOf(yieldsPureResult(sameInstance(Result.success())),
+            assertThat(Fiber.succeeded(), allOf(yieldsPureResult(sameInstance(success())),
                                                 sameInstance(Fiber.succeeded())));
         }
 
@@ -59,6 +60,13 @@ public class FiberTest {
 
     @Nested
     public class Suspension {
+
+        @Test
+        public void runnableConvenienceMethod() {
+            AtomicBoolean ref = new AtomicBoolean();
+            assertThat(fiber(() -> ref.set(true)), yieldsResult(equalTo(success())));
+            assertTrue(ref.get());
+        }
 
         @Test
         public void executesFunctionOnScheduler() {
