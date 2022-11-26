@@ -41,6 +41,11 @@ public sealed interface Result<A> {
 
         private Cancellation() {
         }
+
+        @Override
+        public String toString() {
+            return "Cancellation[]";
+        }
     }
 }
 

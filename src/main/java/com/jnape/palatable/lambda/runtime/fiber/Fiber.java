@@ -9,6 +9,7 @@ import static com.jnape.palatable.lambda.runtime.fiber.Result.cancellation;
 import static com.jnape.palatable.lambda.runtime.fiber.Result.failure;
 import static com.jnape.palatable.lambda.runtime.fiber.Result.success;
 
+//todo: seal
 public interface Fiber<A> {
 
     void execute(Scheduler scheduler, Consumer<? super Result<? extends A>> callback);

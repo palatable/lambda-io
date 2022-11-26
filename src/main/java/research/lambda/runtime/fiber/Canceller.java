@@ -11,32 +11,8 @@ import static com.jnape.palatable.shoki.impl.StrictQueue.strictQueue;
 
 public final class Canceller {
 
-    private static record CancelState(boolean cancelled, HashSet<Canceller> children, StrictQueue<Runnable> onCancel) {
-
-        public CancelState cancel() {
-            return cancelled ? this : new CancelState(true, hashSet(), strictQueue());
-        }
-
-        public CancelState removeChild(Canceller child) {
-            return new CancelState(cancelled, children.remove(child), onCancel);
-        }
-
-        public CancelState addChild(Canceller child) {
-            return cancelled ? this : new CancelState(cancelled, children.add(child), onCancel);
-        }
-
-        public CancelState onCancel(Runnable r) {
-            return cancelled ? this : new CancelState(false, children, onCancel.snoc(r));
-        }
-
-        public static CancelState cancelState() {
-            return new CancelState(false, hashSet(), strictQueue());
-        }
-    }
-
     private final AtomicReference<CancelState> stateRef = new AtomicReference<>(CancelState.cancelState());
     private final Canceller                    parent;
-
     private Canceller(Canceller parent) {
         this.parent = parent;
     }
@@ -87,5 +63,28 @@ public final class Canceller {
 
     public static Canceller root() {
         return new Canceller(null);
+    }
+
+    private record CancelState(boolean cancelled, HashSet<Canceller> children, StrictQueue<Runnable> onCancel) {
+
+        public CancelState cancel() {
+            return cancelled ? this : new CancelState(true, hashSet(), strictQueue());
+        }
+
+        public CancelState removeChild(Canceller child) {
+            return new CancelState(cancelled, children.remove(child), onCancel);
+        }
+
+        public CancelState addChild(Canceller child) {
+            return cancelled ? this : new CancelState(cancelled, children.add(child), onCancel);
+        }
+
+        public CancelState onCancel(Runnable r) {
+            return cancelled ? this : new CancelState(false, children, onCancel.snoc(r));
+        }
+
+        public static CancelState cancelState() {
+            return new CancelState(false, hashSet(), strictQueue());
+        }
     }
 }
