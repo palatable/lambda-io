@@ -1,18 +1,15 @@
 package com.jnape.palatable.lambda.runtime.fiber;
 
 import com.jnape.palatable.lambda.adt.Unit;
+import com.jnape.palatable.lambda.functions.Fn0;
 
 import java.util.function.Consumer;
 
-import static com.jnape.palatable.lambda.adt.Unit.UNIT;
 import static com.jnape.palatable.lambda.runtime.fiber.Result.cancellation;
 import static com.jnape.palatable.lambda.runtime.fiber.Result.failure;
 import static com.jnape.palatable.lambda.runtime.fiber.Result.success;
 
 public interface Fiber<A> {
-
-    Fiber<Unit> SUCCEEDED_UNIT = succeeded(UNIT);
-    Fiber<?>    NEVER          = (scheduler, callback) -> {};
 
     void execute(Scheduler scheduler, Consumer<? super Result<? extends A>> callback);
 
@@ -25,7 +22,7 @@ public interface Fiber<A> {
     }
 
     static Fiber<Unit> succeeded() {
-        return SUCCEEDED_UNIT;
+        return (scheduler, callback) -> callback.accept(success());
     }
 
     static <A> Fiber<A> failed(Throwable t) {
@@ -36,8 +33,19 @@ public interface Fiber<A> {
         return (scheduler, callback) -> callback.accept(cancellation());
     }
 
-    @SuppressWarnings("unchecked")
     static <A> Fiber<A> never() {
-        return (Fiber<A>) NEVER;
+        return (scheduler, callback) -> {};
+    }
+
+    static <A> Fiber<A> fiber(Fn0<? extends A> fn) {
+        return (scheduler, callback) -> scheduler.schedule(() -> {
+            Result<A> result;
+            try {
+                result = success(fn.apply());
+            } catch (Throwable t) {
+                result = failure(t);
+            }
+            callback.accept(result);
+        });
     }
 }

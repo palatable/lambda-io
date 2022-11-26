@@ -161,7 +161,7 @@ record Bind<Z, A>(Fiber<Z> fiberZ, Fn1<? super Z, ? extends Fiber<A>> f) impleme
             });
         } else {
             bind.fiberZ().execute(scheduler, cancel, resultZ -> {
-                if (resultZ instanceof Result.Cancellation<Z> cancellationZ) {
+                if (resultZ instanceof Result.Cancellation<Z>) {
                     ultimateCallback.accept(Result.cancellation());
                 } else if (resultZ instanceof Result.Success<Z> successZ) {
                     try {

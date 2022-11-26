@@ -53,7 +53,11 @@ public final class FiberResultMatcher<A> extends TypeSafeDiagnosingMatcher<Fiber
         return yieldsResult(sameThreadScheduler(), resultMatcher);
     }
 
+    public static <A> FiberResultMatcher<A> yieldsPureResult(Matcher<Result<? extends A>> resultMatcher) {
+        return yieldsResult(THROWING_SCHEDULER, resultMatcher);
+    }
+
     public static <A> FiberResultMatcher<A> yieldsPureResult(Result<? extends A> result) {
-        return yieldsResult(THROWING_SCHEDULER, equalTo(result));
+        return yieldsPureResult(equalTo(result));
     }
 }
