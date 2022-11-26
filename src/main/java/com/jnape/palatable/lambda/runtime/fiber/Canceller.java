@@ -17,7 +17,7 @@ public sealed interface Canceller permits ThreadSafeCancelTree {
 
     void removeChild(Canceller child);
 
-    static Canceller root() {
+    static Canceller canceller() {
         return new ThreadSafeCancelTree(null);
     }
 }

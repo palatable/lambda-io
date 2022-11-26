@@ -1,9 +1,10 @@
 package com.jnape.palatable.lambda.runtime.fiber.testsupport.matcher;
 
 import com.jnape.palatable.lambda.internal.Runtime;
+import com.jnape.palatable.lambda.runtime.fiber.Canceller;
 import com.jnape.palatable.lambda.runtime.fiber.Fiber;
-import com.jnape.palatable.lambda.runtime.fiber.FiberTest;
 import com.jnape.palatable.lambda.runtime.fiber.Result;
+import com.jnape.palatable.lambda.runtime.fiber.Scheduler;
 import org.hamcrest.Description;
 import org.hamcrest.TypeSafeMatcher;
 
@@ -16,19 +17,27 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 public final class FiberTimeoutMatcher<A> extends TypeSafeMatcher<Fiber<? extends A>> {
 
-    private final Duration            timeout;
-    private       Result<? extends A> result;
+    private final Scheduler scheduler;
+    private final Canceller canceller;
+    private final Duration  timeout;
 
-    private FiberTimeoutMatcher(Duration timeout) {
-        this.timeout = timeout;
+    private CompletableFuture<Result<? extends A>> result;
+
+    private FiberTimeoutMatcher(Scheduler scheduler, Canceller canceller, Duration timeout) {
+        this.scheduler = scheduler;
+        this.canceller = canceller;
+        this.timeout   = timeout;
     }
 
     @Override
     protected boolean matchesSafely(Fiber<? extends A> fiber) {
+        if (result == null)
+            result = new CompletableFuture<>() {{
+                fiber.execute(scheduler, canceller, this::complete);
+            }};
+
         try {
-            result = new CompletableFuture<Result<? extends A>>() {{
-                fiber.execute(sameThreadScheduler(), this::complete);
-            }}.get(timeout.toMillis(), MILLISECONDS);
+            result.get(timeout.toMillis(), MILLISECONDS);
             return false;
         } catch (TimeoutException e) {
             return true;
@@ -44,10 +53,24 @@ public final class FiberTimeoutMatcher<A> extends TypeSafeMatcher<Fiber<? extend
 
     @Override
     public void describeTo(Description description) {
-        description.appendText("fiber to run for at least " + timeout.toString());
+        description.appendText("fiber to run for at least " + timeout.toString() + " without yielding result");
+    }
+
+    public static <A> FiberTimeoutMatcher<A> timesOutAfter(Scheduler scheduler,
+                                                           Canceller canceller,
+                                                           Duration duration) {
+        return new FiberTimeoutMatcher<>(scheduler, canceller, duration);
+    }
+
+    public static <A> FiberTimeoutMatcher<A> timesOutAfter(Scheduler scheduler, Duration duration) {
+        return timesOutAfter(scheduler, Canceller.canceller(), duration);
+    }
+
+    public static <A> FiberTimeoutMatcher<A> timesOutAfter(Canceller canceller, Duration duration) {
+        return timesOutAfter(sameThreadScheduler(), canceller, duration);
     }
 
     public static <A> FiberTimeoutMatcher<A> timesOutAfter(Duration duration) {
-        return new FiberTimeoutMatcher<>(duration);
+        return timesOutAfter(Canceller.canceller(), duration);
     }
 }

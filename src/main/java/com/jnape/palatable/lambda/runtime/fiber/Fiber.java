@@ -11,7 +11,7 @@ import static com.jnape.palatable.lambda.runtime.fiber.Result.success;
 
 public sealed interface Fiber<A> {
 
-    void execute(Scheduler scheduler, Consumer<? super Result<? extends A>> callback);
+    void execute(Scheduler scheduler, Canceller canceller, Consumer<? super Result<? extends A>> callback);
 
     static <A> Fiber<A> result(Result<? extends A> result) {
         return new Value<>(result);
@@ -26,11 +26,11 @@ public sealed interface Fiber<A> {
     }
 
     static <A> Fiber<A> failed(Throwable t) {
-        return new Failed<>(t);
+        return result(failure(t));
     }
 
     static <A> Fiber<A> cancelled() {
-        return Cancelled.instance();
+        return Value.cancelled();
     }
 
     static <A> Fiber<A> never() {
@@ -44,35 +44,37 @@ public sealed interface Fiber<A> {
 
 record Value<A>(Result<? extends A> result) implements Fiber<A> {
     static final Value<Unit> SUCCESS_UNIT = new Value<>(success());
+    static final Value<?>    CANCELLED    = new Value<>(cancellation());
 
     @Override
-    public void execute(Scheduler scheduler, Consumer<? super Result<? extends A>> callback) {
+    public void execute(Scheduler scheduler, Canceller canceller, Consumer<? super Result<? extends A>> callback) {
         callback.accept(result);
-    }
-}
-
-record Failed<A>(Throwable reason) implements Fiber<A> {
-
-    @Override
-    public void execute(Scheduler scheduler, Consumer<? super Result<? extends A>> callback) {
-        callback.accept(failure(reason));
-    }
-}
-
-final class Cancelled<A> implements Fiber<A> {
-    static final Cancelled<?> INSTANCE = new Cancelled<>();
-
-    private Cancelled() {
-    }
-
-    @Override
-    public void execute(Scheduler scheduler, Consumer<? super Result<? extends A>> callback) {
-        callback.accept(cancellation());
     }
 
     @SuppressWarnings("unchecked")
-    static <A> Cancelled<A> instance() {
-        return (Cancelled<A>) INSTANCE;
+    static <A> Value<A> cancelled() {
+        return (Value<A>) CANCELLED;
+    }
+}
+
+record Suspension<A>(Fn0<? extends A> fn) implements Fiber<A> {
+    @Override
+    public void execute(Scheduler scheduler, Canceller canceller, Consumer<? super Result<? extends A>> callback) {
+        if (!canceller.cancelled())
+            scheduler.schedule(() -> {
+                Result<A> result;
+                if (canceller.cancelled())
+                    result = cancellation();
+                else
+                    try {
+                        result = success(fn.apply());
+                    } catch (Throwable t) {
+                        result = failure(t);
+                    }
+                callback.accept(result);
+            });
+        else
+            callback.accept(cancellation());
     }
 }
 
@@ -83,26 +85,11 @@ final class Never<A> implements Fiber<A> {
     }
 
     @Override
-    public void execute(Scheduler scheduler, Consumer<? super Result<? extends A>> callback) {
+    public void execute(Scheduler scheduler, Canceller canceller, Consumer<? super Result<? extends A>> callback) {
     }
 
     @SuppressWarnings("unchecked")
     static <A> Never<A> instance() {
         return (Never<A>) INSTANCE;
-    }
-}
-
-record Suspension<A>(Fn0<? extends A> fn) implements Fiber<A> {
-    @Override
-    public void execute(Scheduler scheduler, Consumer<? super Result<? extends A>> callback) {
-        scheduler.schedule(() -> {
-            Result<A> result;
-            try {
-                result = success(fn.apply());
-            } catch (Throwable t) {
-                result = failure(t);
-            }
-            callback.accept(result);
-        });
     }
 }

@@ -15,7 +15,7 @@ public class CancellerTest {
 
     @BeforeEach
     public void setUp() {
-        canceller = Canceller.root();
+        canceller = Canceller.canceller();
     }
 
     @AfterEach
