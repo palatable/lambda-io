@@ -16,7 +16,7 @@ import static research.lambda.effect.io.fiber.Fiber.fiber;
 import static research.lambda.effect.io.fiber.Fiber.forever;
 
 public class FiberBenchmark {
-    private static final Sample              SAMPLE   = sample("native fiber", 100_000_000L, MICROSECONDS);
+    private static final Sample              SAMPLE   = sample("old fiber", 100_000_000L, MICROSECONDS);
     private static final Consumer<Result<?>> CALLBACK = System.out::println;
     private static final Fiber<?>            FOREVER  = forever(fiber(SAMPLE::mark));
 

@@ -1,10 +1,8 @@
 package com.jnape.palatable.lambda.runtime.fiber.benchmark;
 
 import com.jnape.palatable.lambda.runtime.fiber.Fiber;
-import com.jnape.palatable.lambda.runtime.fiber.Result;
 
 import java.util.concurrent.Executor;
-import java.util.function.Consumer;
 
 import static com.jnape.palatable.lambda.runtime.fiber.Canceller.canceller;
 import static com.jnape.palatable.lambda.runtime.fiber.Fiber.fiber;
@@ -24,7 +22,7 @@ public class FiberBenchmark {
 
     private static void doSample(Class<?> clazz, Executor executor) {
         Sample sample = sample(format("Fiber (%s)", clazz.getSimpleName()), 10_000_000L, MICROSECONDS);
-        forever(fiber(sample::mark)).execute(executor::execute, canceller(), (Consumer<Result<?>>) System.out::println);
+        forever(fiber(sample::mark)).execute(executor::execute, canceller(), System.out::println);
     }
 
     public static final class Recursive {

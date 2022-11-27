@@ -92,19 +92,86 @@ record Suspension<A>(Supplier<? extends A> task) implements Fiber<A> {
     }
 }
 
-record Bind<Z, A>(Fiber<Z> fiberZ, Function<? super Z, ? extends Fiber<A>> fn) implements Fiber<A> {
+record Bind<Z, A>(Fiber<Z> fiberZ, Function<? super Z, ? extends Fiber<A>> f) implements Fiber<A> {
+
+    private static final int maxStackDepth = 512;
+
     @Override
     public void execute(Scheduler scheduler, Canceller canceller, Consumer<? super Result<A>> callback) {
-        scheduler.schedule(() -> fiberZ.execute(scheduler, canceller, res -> {
-            if (res instanceof Result.Success<Z> success) {
-                Fiber<A> next = fn.apply(success.value());
-                next.execute(scheduler, canceller, callback);
-            } else if (res instanceof Result.Failure<Z> failure) {
-                callback.accept(failure.contort());
-            } else {
+        tick0(this, scheduler, canceller, callback, 1);
+    }
+
+    private <R> R eliminate(Eliminator<R, A> eliminator) {
+        return eliminator.eliminate(fiberZ, f);
+    }
+
+    private static <A> void tick(Bind<?, A> bind, Scheduler scheduler, Canceller canceller,
+                                 Consumer<? super Result<A>> callback, int stackDepth) {
+        if (bind.fiberZ instanceof Bind<?, ?>)
+            if (canceller.cancelled())
                 callback.accept(cancellation());
-            }
-        }));
+            else
+                scheduler.schedule(() -> tick0(rightAssociated(bind), scheduler, canceller, callback, 0));
+        else
+            tick0(bind, scheduler, canceller, callback, stackDepth);
+    }
+
+    private static <X, A> void tick0(Bind<X, A> bind, Scheduler scheduler, Canceller canceller,
+                                     Consumer<? super Result<A>> finalCallback, int stackDepth) {
+        if (canceller.cancelled()) {
+            finalCallback.accept(cancellation());
+        } else {
+            if (stackDepth == maxStackDepth)
+                scheduler.schedule(() -> bind.fiberZ.execute(scheduler, canceller, resX -> {
+                    if (resX instanceof Result.Success<X> success) {
+                        Fiber<A> nextFiber = bind.f.apply(success.value());
+                        if (nextFiber instanceof Bind<?, A> nextBind) {
+                            // tick
+                            tick0(nextBind, scheduler, canceller, finalCallback, 1);
+                        } else nextFiber.execute(scheduler, canceller, finalCallback);
+                    } else if (resX instanceof Result.Failure<X> failure) {
+                        finalCallback.accept(failure.contort());
+                    } else {
+                        finalCallback.accept(cancellation());
+                    }
+                }));
+            else
+                bind.fiberZ.execute(scheduler, canceller, resX -> {
+                    if (resX instanceof Result.Success<X> success) {
+                        Fiber<A> nextFiber = bind.f.apply(success.value());
+                        if (nextFiber instanceof Bind<?, A> nextBind) {
+                            // tick
+                            tick0(nextBind, scheduler, canceller, finalCallback, stackDepth + 1);
+                        } else nextFiber.execute(scheduler, canceller, finalCallback);
+                    } else if (resX instanceof Result.Failure<X> failure) {
+                        finalCallback.accept(failure.contort());
+                    } else {
+                        finalCallback.accept(cancellation());
+                    }
+                });
+        }
+    }
+
+    private static <A> Bind<?, A> rightAssociated(Bind<?, A> bind) {
+        Bind<?, A> rightAssociated = bind;
+        while (rightAssociated.fiberZ instanceof Bind<?, ?>) {
+            rightAssociated = rightAssociated.eliminate(new Eliminator<>() {
+                @Override
+                public <Z> Bind<?, A> eliminate(Fiber<Z> fiber, Function<? super Z, ? extends Fiber<A>> f) {
+                    return ((Bind<?, Z>) fiber).eliminate(new Eliminator<>() {
+                        @Override
+                        public <Y> Bind<?, A> eliminate(Fiber<Y> fiberY, Function<? super Y, ? extends Fiber<Z>> g) {
+                            return new Bind<>(fiberY, y -> new Bind<>(g.apply(y), f));
+                        }
+                    });
+                }
+            });
+        }
+        return rightAssociated;
+    }
+
+    interface Eliminator<R, A> {
+        <Z> R eliminate(Fiber<Z> fiber, Function<? super Z, ? extends Fiber<A>> fn);
     }
 }
 

@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -16,10 +17,13 @@ import static com.jnape.palatable.lambda.runtime.fiber.Fiber.fiber;
 import static com.jnape.palatable.lambda.runtime.fiber.Fiber.succeeded;
 import static com.jnape.palatable.lambda.runtime.fiber.Result.failure;
 import static com.jnape.palatable.lambda.runtime.fiber.Result.success;
+import static com.jnape.palatable.lambda.runtime.fiber.benchmark.Sample.sample;
 import static com.jnape.palatable.lambda.runtime.fiber.testsupport.matcher.FiberResultMatcher.yieldsPureResult;
 import static com.jnape.palatable.lambda.runtime.fiber.testsupport.matcher.FiberResultMatcher.yieldsResult;
 import static com.jnape.palatable.lambda.runtime.fiber.testsupport.matcher.FiberTimeoutMatcher.timesOutAfter;
 import static com.jnape.palatable.lambda.runtime.fiber.testsupport.scheduler.SameThreadScheduler.sameThreadScheduler;
+import static java.util.concurrent.TimeUnit.MICROSECONDS;
+import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.sameInstance;
@@ -154,10 +158,22 @@ public class FiberTest {
             public void leftBind() {
                 assertThat(times(50_000, f -> f.bind(x -> fiber(() -> x + 1)), succeeded(0)),
                            yieldsResult(sameThreadScheduler(), equalTo(success(50_000))));
-                assertThat(times(50_000, f -> f.bind(x -> fiber(() -> x + 1)), succeeded(0)),
-                           yieldsResult(Runnable::run, equalTo(success(50_000))));
+//                assertThat(times(50_000, f -> f.bind(x -> fiber(() -> x + 1)), succeeded(0)),
+//                           yieldsResult(Runnable::run, equalTo(success(50_000))));
             }
 
+            @Test
+            public void speed() {
+                CompletableFuture<Result<?>> future = new CompletableFuture<>();
+                forever(fiber(sample("bind", 10_000_000, MICROSECONDS)::mark))
+                        .execute(sameThreadScheduler(), canceller(), future::complete);
+                future.join();
+
+            }
+
+            private static <A> Fiber<A> forever(Fiber<?> f) {
+                return f.bind(__ -> forever(f));
+            }
         }
     }
 
