@@ -54,26 +54,6 @@ public sealed interface Fiber<A> {
             return UNIT;
         });
     }
-
-    static <A> Fiber<A> forever(Fiber<?> f) {
-        return new Forever<>(f);
-    }
-}
-
-record Forever<A>(Fiber<?> fiber) implements Fiber<A> {
-
-    @Override
-    public void execute(Scheduler scheduler, Canceller canceller, Consumer<? super Result<A>> callback) {
-        fiber.execute(scheduler, canceller, res -> {
-            if (res instanceof Result.Success<?>) {
-                scheduler.schedule(() -> execute(scheduler, canceller, callback));
-            } else if (res instanceof Result.Failure<?> failure) {
-                callback.accept(failure.contort());
-            } else {
-                callback.accept(cancellation());
-            }
-        });
-    }
 }
 
 record Value<A>(Result<A> result) implements Fiber<A> {

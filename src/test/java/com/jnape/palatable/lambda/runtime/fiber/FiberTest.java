@@ -19,6 +19,7 @@ import static com.jnape.palatable.lambda.runtime.fiber.Result.success;
 import static com.jnape.palatable.lambda.runtime.fiber.testsupport.matcher.FiberResultMatcher.yieldsPureResult;
 import static com.jnape.palatable.lambda.runtime.fiber.testsupport.matcher.FiberResultMatcher.yieldsResult;
 import static com.jnape.palatable.lambda.runtime.fiber.testsupport.matcher.FiberTimeoutMatcher.timesOutAfter;
+import static com.jnape.palatable.lambda.runtime.fiber.testsupport.scheduler.SameThreadScheduler.sameThreadScheduler;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.sameInstance;
@@ -146,10 +147,17 @@ public class FiberTest {
                        yieldsResult(equalTo(success(2))));
         }
 
-        @Test
-        public void stackSafeLeftBind() {
-            assertThat(times(50_000, f -> f.bind(x -> fiber(() -> x + 1)), succeeded(0)),
-                       yieldsResult(equalTo(success(50_000))));
+        @Nested
+        public class StackSafety {
+
+            @Test
+            public void leftBind() {
+                assertThat(times(50_000, f -> f.bind(x -> fiber(() -> x + 1)), succeeded(0)),
+                           yieldsResult(sameThreadScheduler(), equalTo(success(50_000))));
+                assertThat(times(50_000, f -> f.bind(x -> fiber(() -> x + 1)), succeeded(0)),
+                           yieldsResult(Runnable::run, equalTo(success(50_000))));
+            }
+
         }
     }
 
