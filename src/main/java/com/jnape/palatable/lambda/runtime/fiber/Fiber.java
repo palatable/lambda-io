@@ -3,6 +3,7 @@ package com.jnape.palatable.lambda.runtime.fiber;
 import com.jnape.palatable.lambda.adt.Unit;
 
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import static com.jnape.palatable.lambda.adt.Unit.UNIT;
@@ -13,9 +14,13 @@ import static com.jnape.palatable.lambda.runtime.fiber.Result.success;
 //todo: should forever be its own Record?
 public sealed interface Fiber<A> {
 
-    void execute(Scheduler scheduler, Canceller canceller, Consumer<? super Result<? extends A>> callback);
+    void execute(Scheduler scheduler, Canceller canceller, Consumer<? super Result<A>> callback);
 
-    static <A> Fiber<A> result(Result<? extends A> result) {
+    default <B> Fiber<B> bind(Function<? super A, ? extends Fiber<B>> fn) {
+        return new Bind<>(this, fn);
+    }
+
+    static <A> Fiber<A> result(Result<A> result) {
         return new Value<>(result);
     }
 
@@ -49,14 +54,34 @@ public sealed interface Fiber<A> {
             return UNIT;
         });
     }
+
+    static <A> Fiber<A> forever(Fiber<?> f) {
+        return new Forever<>(f);
+    }
 }
 
-record Value<A>(Result<? extends A> result) implements Fiber<A> {
+record Forever<A>(Fiber<?> fiber) implements Fiber<A> {
+
+    @Override
+    public void execute(Scheduler scheduler, Canceller canceller, Consumer<? super Result<A>> callback) {
+        fiber.execute(scheduler, canceller, res -> {
+            if (res instanceof Result.Success<?>) {
+                scheduler.schedule(() -> execute(scheduler, canceller, callback));
+            } else if (res instanceof Result.Failure<?> failure) {
+                callback.accept(failure.contort());
+            } else {
+                callback.accept(cancellation());
+            }
+        });
+    }
+}
+
+record Value<A>(Result<A> result) implements Fiber<A> {
     static final Value<Unit> SUCCESS_UNIT = new Value<>(success());
     static final Value<?>    CANCELLED    = new Value<>(cancellation());
 
     @Override
-    public void execute(Scheduler scheduler, Canceller canceller, Consumer<? super Result<? extends A>> callback) {
+    public void execute(Scheduler scheduler, Canceller canceller, Consumer<? super Result<A>> callback) {
         callback.accept(result);
     }
 
@@ -68,7 +93,7 @@ record Value<A>(Result<? extends A> result) implements Fiber<A> {
 
 record Suspension<A>(Supplier<? extends A> task) implements Fiber<A> {
     @Override
-    public void execute(Scheduler scheduler, Canceller canceller, Consumer<? super Result<? extends A>> callback) {
+    public void execute(Scheduler scheduler, Canceller canceller, Consumer<? super Result<A>> callback) {
         if (!canceller.cancelled())
             scheduler.schedule(() -> {
                 Result<A> result;
@@ -87,6 +112,22 @@ record Suspension<A>(Supplier<? extends A> task) implements Fiber<A> {
     }
 }
 
+record Bind<Z, A>(Fiber<Z> fiberZ, Function<? super Z, ? extends Fiber<A>> fn) implements Fiber<A> {
+    @Override
+    public void execute(Scheduler scheduler, Canceller canceller, Consumer<? super Result<A>> callback) {
+        scheduler.schedule(() -> fiberZ.execute(scheduler, canceller, res -> {
+            if (res instanceof Result.Success<Z> success) {
+                Fiber<A> next = fn.apply(success.value());
+                next.execute(scheduler, canceller, callback);
+            } else if (res instanceof Result.Failure<Z> failure) {
+                callback.accept(failure.contort());
+            } else {
+                callback.accept(cancellation());
+            }
+        }));
+    }
+}
+
 final class Never<A> implements Fiber<A> {
     static final Never<?> INSTANCE = new Never<>();
 
@@ -94,7 +135,7 @@ final class Never<A> implements Fiber<A> {
     }
 
     @Override
-    public void execute(Scheduler scheduler, Canceller canceller, Consumer<? super Result<? extends A>> callback) {
+    public void execute(Scheduler scheduler, Canceller canceller, Consumer<? super Result<A>> callback) {
     }
 
     @SuppressWarnings("unchecked")

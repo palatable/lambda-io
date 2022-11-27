@@ -1,4 +1,4 @@
-package research.fiber.benchmark;
+package com.jnape.palatable.lambda.runtime.fiber.benchmark;
 
 import java.util.concurrent.TimeUnit;
 

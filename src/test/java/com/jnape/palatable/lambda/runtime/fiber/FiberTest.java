@@ -9,9 +9,11 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static com.jnape.palatable.lambda.functions.builtin.fn3.Times.times;
 import static com.jnape.palatable.lambda.internal.Runtime.throwChecked;
 import static com.jnape.palatable.lambda.runtime.fiber.Canceller.canceller;
 import static com.jnape.palatable.lambda.runtime.fiber.Fiber.fiber;
+import static com.jnape.palatable.lambda.runtime.fiber.Fiber.succeeded;
 import static com.jnape.palatable.lambda.runtime.fiber.Result.failure;
 import static com.jnape.palatable.lambda.runtime.fiber.Result.success;
 import static com.jnape.palatable.lambda.runtime.fiber.testsupport.matcher.FiberResultMatcher.yieldsPureResult;
@@ -132,6 +134,22 @@ public class FiberTest {
                 r.run();
             }, canceller, equalTo(Result.cancellation())));
             assertFalse(invoked.get());
+        }
+    }
+
+    @Nested
+    public class Bind {
+
+        @Test
+        public void cancellationPreemptsBind() {
+            assertThat(fiber(() -> 1).bind(x -> fiber(() -> x + 1)),
+                       yieldsResult(equalTo(success(2))));
+        }
+
+        @Test
+        public void stackSafeLeftBind() {
+            assertThat(times(50_000, f -> f.bind(x -> fiber(() -> x + 1)), succeeded(0)),
+                       yieldsResult(equalTo(success(50_000))));
         }
     }
 
