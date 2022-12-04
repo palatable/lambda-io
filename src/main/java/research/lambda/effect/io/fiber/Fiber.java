@@ -128,14 +128,6 @@ public interface Fiber<A> {
 
 record Bind<Z, A>(Fiber<Z> fiberZ, Fn1<? super Z, ? extends Fiber<A>> f) implements Fiber<A> {
 
-    interface Eliminator<A> {
-        <Z> void apply(Fiber<Z> fiberZ, Fn1<? super Z, ? extends Fiber<A>> f);
-    }
-
-    void eliminate(Eliminator<A> eliminator) {
-        eliminator.apply(fiberZ, f);
-    }
-
     @Override
     public void execute(Scheduler scheduler, Canceller cancel, Consumer<? super Result<A>> callback) {
         tick(this, scheduler, callback, cancel, 1);
@@ -149,39 +141,27 @@ record Bind<Z, A>(Fiber<Z> fiberZ, Fn1<? super Z, ? extends Fiber<A>> f) impleme
             ultimateCallback.accept(Result.cancellation());
             return;
         }
-        if (bind.fiberZ() instanceof Bind<?, Z> bindZ) {
-            bindZ.eliminate(new Eliminator<>() {
-                @Override
-                public <Y> void apply(Fiber<Y> fiberY, Fn1<? super Y, ? extends Fiber<Z>> g) {
-                    if (stackDepth == stackFrameTransplantDepth) scheduler.schedule(() -> new Bind<>(fiberY, y -> new Bind<>(g.apply(y), bind.f())).execute(scheduler, cancel, ultimateCallback));
-                    else {
-                        tick(new Bind<>(fiberY, y -> new Bind<>(g.apply(y), bind.f())), scheduler, ultimateCallback, cancel, stackDepth + 1);
-                    }
-                }
-            });
-        } else {
-            bind.fiberZ().execute(scheduler, cancel, resultZ -> {
-                if (resultZ instanceof Result.Cancellation<Z>) {
-                    ultimateCallback.accept(Result.cancellation());
-                } else if (resultZ instanceof Result.Success<Z> successZ) {
-                    try {
-                        Fiber<A> fiberA = bind.f().apply(successZ.value());
-                        if (fiberA instanceof Bind<?, A> bindA) {
-                            if (stackDepth == stackFrameTransplantDepth) scheduler.schedule(() -> bindA.execute(scheduler, cancel, ultimateCallback));
-                            else {
-                                tick(bindA, scheduler, ultimateCallback, cancel, stackDepth + 1);
-                            }
-                        } else {
-                            if (stackDepth == stackFrameTransplantDepth) scheduler.schedule(() -> fiberA.execute(scheduler, cancel, ultimateCallback));
-                            else fiberA.execute(scheduler, cancel, ultimateCallback);
+        bind.fiberZ().execute(scheduler, cancel, resultZ -> {
+            if (resultZ instanceof Result.Cancellation<Z>) {
+                ultimateCallback.accept(Result.cancellation());
+            } else if (resultZ instanceof Result.Success<Z> successZ) {
+                try {
+                    Fiber<A> fiberA = bind.f().apply(successZ.value());
+                    if (fiberA instanceof Bind<?, A> bindA) {
+                        if (stackDepth == stackFrameTransplantDepth) scheduler.schedule(() -> bindA.execute(scheduler, cancel, ultimateCallback));
+                        else {
+                            tick(bindA, scheduler, ultimateCallback, cancel, stackDepth + 1);
                         }
-                    } catch (Throwable t) {
-                        ultimateCallback.accept(Result.failure(new ExceptionOutsideOfFiber(t)));
+                    } else {
+                        if (stackDepth == stackFrameTransplantDepth) scheduler.schedule(() -> fiberA.execute(scheduler, cancel, ultimateCallback));
+                        else fiberA.execute(scheduler, cancel, ultimateCallback);
                     }
-                } else {
-                    ultimateCallback.accept(((Result.Failure<Z>) resultZ).contort());
+                } catch (Throwable t) {
+                    ultimateCallback.accept(Result.failure(new ExceptionOutsideOfFiber(t)));
                 }
-            });
-        }
+            } else {
+                ultimateCallback.accept(((Result.Failure<Z>) resultZ).contort());
+            }
+        });
     }
 }
