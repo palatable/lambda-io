@@ -2,6 +2,7 @@ package com.jnape.palatable.lambda.runtime.fiber;
 
 import com.jnape.palatable.lambda.adt.Unit;
 
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -11,12 +12,13 @@ import static com.jnape.palatable.lambda.runtime.fiber.Result.cancellation;
 import static com.jnape.palatable.lambda.runtime.fiber.Result.failure;
 import static com.jnape.palatable.lambda.runtime.fiber.Result.success;
 
-//todo: should forever be its own Record?
 //todo: should Suspensions:
 // - try/catch
 // - shift onto scheduler
 //todo: should fiber execution be wrapped in try/catch and re-throw as critical error?
 //todo: ThreadLocal choice for current trampoline / scheduler ("shift" model)?
+//todo: Fiber#fork(Fiber)
+//todo: move all scheduling to separate Fiber runtime; records should merely be instructions holding callbacks
 public sealed interface Fiber<A> {
 
     void execute(Scheduler scheduler, Canceller canceller, Consumer<? super Result<A>> callback);
@@ -45,7 +47,10 @@ public sealed interface Fiber<A> {
         return result(failure(t));
     }
 
-    // TODO: should this even be convenient? Should it invoke Canceller#cancel?
+    static <A> Fiber<A> race(Fiber<A> fiberA, Fiber<A> fiberB) {
+        return new Race<>(fiberA, fiberB);
+    }
+
     static <A> Fiber<A> cancelled() {
         return Value.cancelled();
     }
@@ -85,8 +90,7 @@ record Suspension<A>(Consumer<? super Consumer<? super Result<A>>> k) implements
         if (canceller.cancelled())
             callback.accept(cancellation());
         else
-            //todo: should this implicitly run on scheduler or expect scheduler choice to happen at execution time?
-            // - eliminating this "schedule" call unsurprisingly dramatically improves performance
+            //todo: eliminate explicit schedule call when moving to separate runtime
             scheduler.schedule(() -> k.accept(callback));
     }
 }
@@ -209,6 +213,31 @@ record Bind<Z, A>(Fiber<Z> fiberZ, Function<? super Z, ? extends Fiber<A>> f) im
 
     interface Eliminator<R, A> {
         <Z> R eliminate(Fiber<Z> fiber, Function<? super Z, ? extends Fiber<A>> fn);
+    }
+}
+
+record Race<A>(Fiber<A> fiberA, Fiber<A> fiberB) implements Fiber<A> {
+
+    @Override
+    public void execute(Scheduler scheduler, Canceller canceller, Consumer<? super Result<A>> callback) {
+        if (canceller.cancelled()) {
+            callback.accept(cancellation());
+        } else {
+            Canceller     child  = canceller.addChild();
+            AtomicBoolean winner = new AtomicBoolean(true);
+            race(scheduler, callback, child, winner, fiberA);
+            race(scheduler, callback, child, winner, fiberB);
+        }
+    }
+
+    private void race(Scheduler scheduler, Consumer<? super Result<A>> callback, Canceller child, AtomicBoolean winner,
+                      Fiber<A> fiber) {
+        scheduler.schedule(() -> fiber.execute(scheduler, child, res -> {
+            if (winner.getAndSet(false)) {
+                child.cancel();
+                callback.accept(res);
+            }
+        }));
     }
 }
 

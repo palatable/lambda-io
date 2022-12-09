@@ -14,12 +14,12 @@ import static com.jnape.palatable.lambda.internal.Runtime.throwChecked;
 import static com.jnape.palatable.lambda.runtime.fiber.Canceller.canceller;
 import static com.jnape.palatable.lambda.runtime.fiber.Fiber.fiber;
 import static com.jnape.palatable.lambda.runtime.fiber.Fiber.succeeded;
+import static com.jnape.palatable.lambda.runtime.fiber.Result.cancellation;
 import static com.jnape.palatable.lambda.runtime.fiber.Result.failure;
 import static com.jnape.palatable.lambda.runtime.fiber.Result.success;
 import static com.jnape.palatable.lambda.runtime.fiber.testsupport.matcher.FiberResultMatcher.yieldsPureResult;
 import static com.jnape.palatable.lambda.runtime.fiber.testsupport.matcher.FiberResultMatcher.yieldsResult;
 import static com.jnape.palatable.lambda.runtime.fiber.testsupport.matcher.FiberTimeoutMatcher.timesOutAfter;
-import static com.jnape.palatable.lambda.runtime.fiber.testsupport.scheduler.SameThreadScheduler.sameThreadScheduler;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.sameInstance;
@@ -139,8 +139,49 @@ public class FiberTest {
             public void leftBind() {
                 int n = 50_000;
                 assertThat(times(n, f -> f.bind(x -> fiber(() -> x + 1)), succeeded(0)),
-                           yieldsResult(sameThreadScheduler(), equalTo(success(n))));
+                           yieldsResult(equalTo(success(n))));
             }
+        }
+    }
+
+    @Nested
+    public class Race {
+
+        @Test
+        public void cancellationPreemptsRace() {
+            Canceller canceller = canceller();
+            canceller.cancel();
+            assertThat(Fiber.race(succeeded(1), succeeded(2)),
+                       yieldsPureResult(equalTo(cancellation())));
+        }
+
+        @Test
+        public void firstFinisherWins() {
+            assertThat(Fiber.race(succeeded(1), Fiber.never()),
+                       yieldsResult(equalTo(success(1))));
+            assertThat(Fiber.race(Fiber.never(), succeeded(2)),
+                       yieldsResult(equalTo(success(2))));
+        }
+
+        @Test
+        public void losingFiberIsCancelled() {
+            AtomicBoolean loserExecuted = new AtomicBoolean(false);
+            assertThat(Fiber.race(succeeded(), Fiber.fiber(() -> loserExecuted.set(true))),
+                       yieldsResult(equalTo(success())));
+            assertFalse(loserExecuted.get());
+        }
+
+        @Test
+        public void cancellationAfterStartStillCancels() {
+            Canceller canceller = canceller();
+
+            AtomicInteger  invocations = new AtomicInteger(0);
+            Fiber<Integer> fiber       = fiber(invocations::incrementAndGet);
+            assertThat(Fiber.race(fiber, fiber),
+                       yieldsResult(runnable -> {
+                           canceller.cancel();
+                           runnable.run();
+                       }, canceller, equalTo(cancellation())));
         }
     }
 

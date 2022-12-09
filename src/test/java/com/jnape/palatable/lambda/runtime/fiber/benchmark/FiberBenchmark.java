@@ -1,7 +1,5 @@
 package com.jnape.palatable.lambda.runtime.fiber.benchmark;
 
-import com.jnape.palatable.lambda.runtime.fiber.Fiber;
-
 import java.util.concurrent.Executor;
 
 import static com.jnape.palatable.lambda.runtime.fiber.Canceller.canceller;
@@ -20,13 +18,6 @@ public class FiberBenchmark {
     private static void doSample(Class<?> clazz, Executor executor) {
         Sample sample = sample(format("Fiber (%s)", clazz.getSimpleName()), 100_000_000L, MICROSECONDS);
         executor.execute(() -> forever(fiber(sample::mark)).execute(executor::execute, canceller(), System.out::println));
-    }
-
-    public static final class Recursive {
-
-        public static void main(String[] args) {
-            doSample(Recursive.class, Runnable::run);
-        }
     }
 
     public static final class Trampolined {
