@@ -1,5 +1,9 @@
 package com.jnape.palatable.lambda.effect.io.fiber.benchmark;
 
+import com.jnape.palatable.lambda.adt.Unit;
+import com.jnape.palatable.lambda.effect.io.fiber.Fiber;
+import com.jnape.palatable.lambda.effect.io.fiber.Trampoline;
+
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
 
@@ -8,6 +12,7 @@ import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.fiber;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.forever;
 import static com.jnape.palatable.lambda.effect.io.fiber.benchmark.Sample.sample;
 import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.scheduler.SameThreadScheduler.sameThreadScheduler;
+import static com.jnape.palatable.lambda.functions.builtin.fn3.Times.times;
 import static java.lang.String.format;
 import static java.lang.Thread.currentThread;
 import static java.util.concurrent.Executors.newCachedThreadPool;
@@ -28,8 +33,38 @@ public class FiberBenchmark {
      */
     public static final class Trampolined {
 
-        public static void main(String[] args) {
-            doSample(Trampolined.class, sameThreadScheduler()::schedule);
+        public static final class Forever {
+            public static void main(String[] args) {
+                Sample sample = sample(format("Fiber (%s)", Trampolined.class.getSimpleName()), 10_000_000L, MICROSECONDS);
+                new Trampoline(sameThreadScheduler()).unsafeRunAsync(forever(fiber(sample::mark)), System.out::println);
+            }
+        }
+
+        public static final class DeepBind {
+            public static void main(String[] args) {
+                Sample sample = sample(format("Fiber (%s)", Trampolined.class.getSimpleName()), 10_000_000L, MICROSECONDS);
+
+                Fiber<Unit> fiber   = fiber(sample::mark);
+                Fiber<Unit> forever = times(100_000, f -> f.bind(__ -> f), fiber);
+
+                new Trampoline(sameThreadScheduler()).unsafeRunAsync(forever, System.out::println);
+            }
+        }
+
+        public static final class ShallowBind {
+            private static <A> Fiber<A> foreverBind(Fiber<?> fiber) {
+                return fiber.bind(__ -> foreverBind(fiber));
+            }
+
+            public static void main(String[] args) throws InterruptedException {
+                Sample sample = sample(format("Fiber (%s)", Trampolined.class.getSimpleName()), 10_000_000L, MICROSECONDS);
+
+                Fiber<Unit> fiber   = fiber(sample::mark);
+                Fiber<Unit> forever = foreverBind(times(100_000, f -> f.bind(__ -> f), fiber));
+
+                new Trampoline(ForkJoinPool.commonPool()::execute).unsafeRunAsync(forever, System.out::println);
+                Thread.currentThread().join();
+            }
         }
     }
 

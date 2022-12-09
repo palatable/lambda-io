@@ -146,14 +146,14 @@ record Bind<Z, A>(Fiber<Z> fiberZ, Function<? super Z, ? extends Fiber<A>> f) im
 
     @Override
     public void execute(Scheduler scheduler, Canceller canceller, Consumer<? super Result<A>> callback) {
-        tick(this, scheduler, canceller, callback, 1);
+        bind(this, scheduler, canceller, callback, 1);
     }
 
-    private <R> R eliminate(Eliminator<R, A> eliminator) {
+    <R> R eliminate(Eliminator<R, A> eliminator) {
         return eliminator.eliminate(fiberZ, f);
     }
 
-    private static <A> void tick(Bind<?, A> bind, Scheduler scheduler, Canceller canceller,
+    private static <A> void bind(Bind<?, A> bind, Scheduler scheduler, Canceller canceller,
                                  Consumer<? super Result<A>> callback, int tickRecursionDepth) {
         tick0((Bind<?, A>) (bind.fiberZ instanceof Bind<?, ?> ? rightAssociated(bind) : bind),
               scheduler, canceller, callback, tickRecursionDepth + 1);
@@ -169,7 +169,7 @@ record Bind<Z, A>(Fiber<Z> fiberZ, Function<? super Z, ? extends Fiber<A>> f) im
                     if (resX instanceof Result.Success<X> success) {
                         Fiber<A> nextFiber = bind.f.apply(success.value());
                         if (nextFiber instanceof Bind<?, A> nextBind) {
-                            tick(nextBind, scheduler, canceller, finalCallback, 1);
+                            bind(nextBind, scheduler, canceller, finalCallback, 1);
                         } else nextFiber.execute(scheduler, canceller, finalCallback);
                     } else if (resX instanceof Result.Failure<X> failure) {
                         finalCallback.accept(failure.contort());
@@ -182,7 +182,7 @@ record Bind<Z, A>(Fiber<Z> fiberZ, Function<? super Z, ? extends Fiber<A>> f) im
                     if (resX instanceof Result.Success<X> success) {
                         Fiber<A> nextFiber = bind.f.apply(success.value());
                         if (nextFiber instanceof Bind<?, A> nextBind) {
-                            tick(nextBind, scheduler, canceller, finalCallback, stackDepth + 1);
+                            bind(nextBind, scheduler, canceller, finalCallback, stackDepth + 1);
                         } else nextFiber.execute(scheduler, canceller, finalCallback);
                     } else if (resX instanceof Result.Failure<X> failure) {
                         finalCallback.accept(failure.contort());
