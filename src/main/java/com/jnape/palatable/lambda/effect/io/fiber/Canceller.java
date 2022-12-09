@@ -1,10 +1,10 @@
-package com.jnape.palatable.lambda.runtime.fiber;
+package com.jnape.palatable.lambda.effect.io.fiber;
 
 import com.jnape.palatable.shoki.impl.HashSet;
 
 import java.util.concurrent.atomic.AtomicReference;
 
-import static com.jnape.palatable.lambda.runtime.fiber.CancelState.fresh;
+import static com.jnape.palatable.lambda.effect.io.fiber.CancelState.fresh;
 import static com.jnape.palatable.shoki.impl.HashSet.hashSet;
 
 public sealed interface Canceller permits ThreadSafeCancelTree {

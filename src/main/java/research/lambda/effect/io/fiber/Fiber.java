@@ -1,27 +1,20 @@
 package research.lambda.effect.io.fiber;
 
 import com.jnape.palatable.lambda.adt.Unit;
-import com.jnape.palatable.lambda.adt.choice.Choice2;
 import com.jnape.palatable.lambda.functions.Fn0;
 import com.jnape.palatable.lambda.functions.Fn1;
 import com.jnape.palatable.lambda.functions.specialized.SideEffect;
+import com.jnape.palatable.lambda.effect.io.fiber.Result;
+import com.jnape.palatable.lambda.effect.io.fiber.Scheduler;
 import research.lambda.runtime.fiber.Canceller;
-import com.jnape.palatable.lambda.runtime.fiber.Result;
-import com.jnape.palatable.lambda.runtime.fiber.Scheduler;
 import research.lambda.runtime.fiber.internal.Array;
 
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import static com.jnape.palatable.lambda.adt.Unit.UNIT;
-import static com.jnape.palatable.lambda.adt.choice.Choice2.a;
-import static com.jnape.palatable.lambda.adt.choice.Choice2.b;
 
 public interface Fiber<A> {
-
-    Fiber<?> NEVER = (s, c, k) -> {};
 
     void execute(Scheduler scheduler, Canceller cancel, Consumer<? super Result<A>> callback);
 
@@ -34,28 +27,6 @@ public interface Fiber<A> {
             sideEffect.Ω();
             return UNIT;
         });
-    }
-
-    static <A, B> Fiber<Choice2<A, B>> race(Fiber<A> a, Fiber<B> b) {
-        return (s, c, k) -> {
-            if (c.cancelled()) k.accept(Result.cancellation());
-            else {
-                AtomicBoolean flag  = new AtomicBoolean(false);
-                Canceller     child = c.addChild();
-                s.schedule(() -> a.execute(s, child, res -> {
-                    if (!flag.getAndSet(true)) {
-                        child.cancel();
-                        k.accept(c.cancelled() || res instanceof Result.Cancellation<?> ? Result.cancellation() : res instanceof Result.Success<A> success ? Result.success(a(success.value())) : ((Result.Failure<?>) res).contort());
-                    }
-                }));
-                s.schedule(() -> b.execute(s, child, res -> {
-                    if (!flag.getAndSet(true)) {
-                        child.cancel();
-                        k.accept(c.cancelled() || res instanceof Result.Cancellation<?> ? Result.cancellation() : res instanceof Result.Success<B> success ? Result.success(b(success.value())) : ((Result.Failure<?>) res).contort());
-                    }
-                }));
-            }
-        };
     }
 
     @SafeVarargs
@@ -95,35 +66,6 @@ public interface Fiber<A> {
         });
     }
 
-    static <A> Fiber<A> fail(Throwable t) {
-        return cancellable(c -> c.accept(Result.failure(t)));
-    }
-
-
-    default <B> Fiber<B> bind(Fn1<? super A, ? extends Fiber<B>> f) {
-        return new Bind<>(this, f);
-    }
-
-    static <A, B> Fiber<B> forever(Fiber<A> fiber) {
-        return fiber.bind(__ -> forever(fiber));
-    }
-
-    @SuppressWarnings("unchecked")
-    static <A> Fiber<A> never() {
-        return (Fiber<A>) NEVER;
-    }
-
-    static <A> Fiber<A> cancellable(BiConsumer<? super Scheduler, ? super Consumer<? super Result<A>>> task) {
-        return (scheduler, cancel, callback) -> {
-            if (cancel.cancelled()) {
-                callback.accept(Result.cancellation());
-            } else task.accept(scheduler, callback);
-        };
-    }
-
-    static <A> Fiber<A> cancellable(Consumer<? super Consumer<? super Result<A>>> task) {
-        return cancellable((__, callback) -> task.accept(callback));
-    }
 }
 
 record Bind<Z, A>(Fiber<Z> fiberZ, Fn1<? super Z, ? extends Fiber<A>> f) implements Fiber<A> {

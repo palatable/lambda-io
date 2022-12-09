@@ -1,5 +1,8 @@
-package com.jnape.palatable.lambda.runtime.fiber;
+package com.jnape.palatable.lambda.effect.io.fiber;
 
+import com.jnape.palatable.lambda.effect.io.fiber.testsupport.matcher.FiberResultMatcher;
+import com.jnape.palatable.lambda.effect.io.fiber.testsupport.matcher.FiberTimeoutMatcher;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
@@ -11,15 +14,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.jnape.palatable.lambda.functions.builtin.fn3.Times.times;
 import static com.jnape.palatable.lambda.internal.Runtime.throwChecked;
-import static com.jnape.palatable.lambda.runtime.fiber.Canceller.canceller;
-import static com.jnape.palatable.lambda.runtime.fiber.Fiber.fiber;
-import static com.jnape.palatable.lambda.runtime.fiber.Fiber.succeeded;
-import static com.jnape.palatable.lambda.runtime.fiber.Result.cancellation;
-import static com.jnape.palatable.lambda.runtime.fiber.Result.failure;
-import static com.jnape.palatable.lambda.runtime.fiber.Result.success;
-import static com.jnape.palatable.lambda.runtime.fiber.testsupport.matcher.FiberResultMatcher.yieldsPureResult;
-import static com.jnape.palatable.lambda.runtime.fiber.testsupport.matcher.FiberResultMatcher.yieldsResult;
-import static com.jnape.palatable.lambda.runtime.fiber.testsupport.matcher.FiberTimeoutMatcher.timesOutAfter;
+import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.fiber;
+import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.succeeded;
+import static com.jnape.palatable.lambda.effect.io.fiber.Result.success;
+import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.matcher.FiberResultMatcher.yieldsPureResult;
+import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.matcher.FiberResultMatcher.yieldsResult;
+import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.matcher.FiberTimeoutMatcher.timesOutAfter;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.sameInstance;
@@ -37,27 +37,27 @@ public class FiberTest {
 
         @Test
         public void resultIsPure() {
-            Result<Integer> result = success(1);
-            assertThat(Fiber.result(result), yieldsPureResult(result));
+            Result<Integer> result = Result.success(1);
+            assertThat(Fiber.result(result), FiberResultMatcher.yieldsPureResult(result));
         }
 
         @Test
         public void succeededConvenienceMethods() {
-            assertThat(Fiber.succeeded(1), yieldsPureResult(success(1)));
-            assertThat(Fiber.succeeded(), allOf(yieldsPureResult(sameInstance(success())),
-                                                sameInstance(Fiber.succeeded())));
+            assertThat(Fiber.succeeded(1), FiberResultMatcher.yieldsPureResult(Result.success(1)));
+            assertThat(Fiber.succeeded(), Matchers.allOf(FiberResultMatcher.yieldsPureResult(sameInstance(Result.success())),
+                                                         sameInstance(Fiber.succeeded())));
         }
 
         @Test
         public void failedConvenientMethod() {
             Throwable cause = new RuntimeException();
-            assertThat(Fiber.failed(cause), yieldsPureResult(failure(cause)));
+            assertThat(Fiber.failed(cause), FiberResultMatcher.yieldsPureResult(Result.failure(cause)));
         }
 
         @Test
         public void cancelledConvenienceMethod() {
-            assertThat(Fiber.cancelled(), allOf(yieldsPureResult(sameInstance(Result.cancellation())),
-                                                sameInstance(Fiber.cancelled())));
+            assertThat(Fiber.cancelled(), Matchers.allOf(FiberResultMatcher.yieldsPureResult(sameInstance(Result.cancellation())),
+                                                         sameInstance(Fiber.cancelled())));
         }
     }
 
@@ -67,7 +67,7 @@ public class FiberTest {
         @Test
         public void runnableConvenienceMethod() {
             AtomicBoolean ref = new AtomicBoolean();
-            assertThat(fiber(() -> ref.set(true)), yieldsResult(equalTo(success())));
+            assertThat(Fiber.fiber(() -> ref.set(true)), FiberResultMatcher.yieldsResult(equalTo(Result.success())));
             assertTrue(ref.get());
         }
 
@@ -75,21 +75,21 @@ public class FiberTest {
         public void executesFunctionOnScheduler() {
             List<String> interactions = new ArrayList<>();
 
-            assertThat(fiber(() -> {
+            assertThat(Fiber.fiber(() -> {
                 interactions.add("running");
                 return interactions;
-            }), yieldsResult(runnable -> {
+            }), FiberResultMatcher.yieldsResult(runnable -> {
                 interactions.add("scheduled");
                 runnable.run();
-            }, canceller(), equalTo(success(List.of("scheduled", "running")))));
+            }, Canceller.canceller(), equalTo(Result.success(List.of("scheduled", "running")))));
         }
 
         @Test
         public void catchesThrowableFromFunction() {
             RuntimeException throwable = new IllegalStateException("blew up");
-            assertThat(fiber(() -> {
+            assertThat(Fiber.fiber(() -> {
                 throw throwable;
-            }), yieldsResult(equalTo(failure(throwable))));
+            }), FiberResultMatcher.yieldsResult(equalTo(Result.failure(throwable))));
         }
 
         @Test
@@ -97,7 +97,7 @@ public class FiberTest {
             Throwable     throwable         = new Exception("blew up");
             AtomicInteger invocationCounter = new AtomicInteger(0);
             try {
-                fiber(() -> 1).execute(Runnable::run, canceller(), res -> {
+                Fiber.fiber(() -> 1).execute(Runnable::run, Canceller.canceller(), res -> {
                     invocationCounter.incrementAndGet();
                     throw throwChecked(throwable);
                 });
@@ -112,13 +112,13 @@ public class FiberTest {
 
         @Test
         public void fiberCancellationPreemptsScheduling() {
-            Canceller canceller = canceller();
+            Canceller canceller = Canceller.canceller();
             canceller.cancel();
             AtomicBoolean invoked = new AtomicBoolean(false);
-            assertThat(fiber(() -> {
+            assertThat(Fiber.fiber(() -> {
                 invoked.set(true);
                 return 1;
-            }), yieldsResult(canceller, equalTo(Result.cancellation())));
+            }), FiberResultMatcher.yieldsResult(canceller, equalTo(Result.cancellation())));
             assertFalse(invoked.get());
         }
     }
@@ -128,8 +128,8 @@ public class FiberTest {
 
         @Test
         public void cancellationPreemptsBind() {
-            assertThat(fiber(() -> 1).bind(x -> fiber(() -> x + 1)),
-                       yieldsResult(equalTo(success(2))));
+            assertThat(Fiber.fiber(() -> 1).bind(x -> Fiber.fiber(() -> x + 1)),
+                       FiberResultMatcher.yieldsResult(equalTo(Result.success(2))));
         }
 
         @Nested
@@ -138,8 +138,8 @@ public class FiberTest {
             @Test
             public void leftBind() {
                 int n = 50_000;
-                assertThat(times(n, f -> f.bind(x -> fiber(() -> x + 1)), succeeded(0)),
-                           yieldsResult(equalTo(success(n))));
+                assertThat(times(n, f -> f.bind(x -> Fiber.fiber(() -> x + 1)), Fiber.succeeded(0)),
+                           FiberResultMatcher.yieldsResult(equalTo(Result.success(n))));
             }
         }
     }
@@ -149,39 +149,39 @@ public class FiberTest {
 
         @Test
         public void cancellationPreemptsRace() {
-            Canceller canceller = canceller();
+            Canceller canceller = Canceller.canceller();
             canceller.cancel();
-            assertThat(Fiber.race(succeeded(1), succeeded(2)),
-                       yieldsPureResult(equalTo(cancellation())));
+            assertThat(Fiber.race(Fiber.succeeded(1), Fiber.succeeded(2)),
+                       FiberResultMatcher.yieldsPureResult(equalTo(Result.cancellation())));
         }
 
         @Test
         public void firstFinisherWins() {
-            assertThat(Fiber.race(succeeded(1), Fiber.never()),
-                       yieldsResult(equalTo(success(1))));
-            assertThat(Fiber.race(Fiber.never(), succeeded(2)),
-                       yieldsResult(equalTo(success(2))));
+            assertThat(Fiber.race(Fiber.succeeded(1), Fiber.never()),
+                       FiberResultMatcher.yieldsResult(equalTo(Result.success(1))));
+            assertThat(Fiber.race(Fiber.never(), Fiber.succeeded(2)),
+                       FiberResultMatcher.yieldsResult(equalTo(Result.success(2))));
         }
 
         @Test
         public void losingFiberIsCancelled() {
             AtomicBoolean loserExecuted = new AtomicBoolean(false);
-            assertThat(Fiber.race(succeeded(), Fiber.fiber(() -> loserExecuted.set(true))),
-                       yieldsResult(equalTo(success())));
+            assertThat(Fiber.race(Fiber.succeeded(), Fiber.fiber(() -> loserExecuted.set(true))),
+                       FiberResultMatcher.yieldsResult(equalTo(Result.success())));
             assertFalse(loserExecuted.get());
         }
 
         @Test
         public void cancellationAfterStartStillCancels() {
-            Canceller canceller = canceller();
+            Canceller canceller = Canceller.canceller();
 
             AtomicInteger  invocations = new AtomicInteger(0);
-            Fiber<Integer> fiber       = fiber(invocations::incrementAndGet);
+            Fiber<Integer> fiber       = Fiber.fiber(invocations::incrementAndGet);
             assertThat(Fiber.race(fiber, fiber),
-                       yieldsResult(runnable -> {
+                       FiberResultMatcher.yieldsResult(runnable -> {
                            canceller.cancel();
                            runnable.run();
-                       }, canceller, equalTo(cancellation())));
+                       }, canceller, equalTo(Result.cancellation())));
         }
     }
 
@@ -190,15 +190,15 @@ public class FiberTest {
 
         @Test
         public void neverInvokesCallback() {
-            assertThat(Fiber.never(), allOf(timesOutAfter(Duration.ofMillis(50)),
-                                            sameInstance(Fiber.never())));
+            assertThat(Fiber.never(), Matchers.allOf(FiberTimeoutMatcher.timesOutAfter(Duration.ofMillis(50)),
+                                                     sameInstance(Fiber.never())));
         }
 
         @Test
         public void neverCannotBeCancelled() {
-            Canceller canceller = canceller();
+            Canceller canceller = Canceller.canceller();
             canceller.cancel();
-            assertThat(Fiber.never(), timesOutAfter(canceller, Duration.ofMillis(50)));
+            assertThat(Fiber.never(), FiberTimeoutMatcher.timesOutAfter(canceller, Duration.ofMillis(50)));
         }
     }
 }

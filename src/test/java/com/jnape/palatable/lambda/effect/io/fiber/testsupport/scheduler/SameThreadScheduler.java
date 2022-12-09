@@ -1,6 +1,6 @@
-package com.jnape.palatable.lambda.runtime.fiber.testsupport.scheduler;
+package com.jnape.palatable.lambda.effect.io.fiber.testsupport.scheduler;
 
-import com.jnape.palatable.lambda.runtime.fiber.Scheduler;
+import com.jnape.palatable.lambda.effect.io.fiber.Scheduler;
 
 import java.util.ArrayList;
 import java.util.concurrent.ArrayBlockingQueue;

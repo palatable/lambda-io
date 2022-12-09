@@ -1,4 +1,4 @@
-package com.jnape.palatable.lambda.runtime.fiber;
+package com.jnape.palatable.lambda.effect.io.fiber;
 
 import com.jnape.palatable.lambda.adt.Unit;
 
@@ -8,9 +8,9 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 import static com.jnape.palatable.lambda.adt.Unit.UNIT;
-import static com.jnape.palatable.lambda.runtime.fiber.Result.cancellation;
-import static com.jnape.palatable.lambda.runtime.fiber.Result.failure;
-import static com.jnape.palatable.lambda.runtime.fiber.Result.success;
+import static com.jnape.palatable.lambda.effect.io.fiber.Result.cancellation;
+import static com.jnape.palatable.lambda.effect.io.fiber.Result.failure;
+import static com.jnape.palatable.lambda.effect.io.fiber.Result.success;
 
 //todo: should Suspensions:
 // - try/catch

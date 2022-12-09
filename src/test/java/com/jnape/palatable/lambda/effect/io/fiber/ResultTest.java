@@ -1,4 +1,4 @@
-package com.jnape.palatable.lambda.runtime.fiber;
+package com.jnape.palatable.lambda.effect.io.fiber;
 
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;

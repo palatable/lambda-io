@@ -1,16 +1,16 @@
-package com.jnape.palatable.lambda.runtime.fiber.testsupport.matcher;
+package com.jnape.palatable.lambda.effect.io.fiber.testsupport.matcher;
 
-import com.jnape.palatable.lambda.runtime.fiber.Canceller;
-import com.jnape.palatable.lambda.runtime.fiber.Fiber;
-import com.jnape.palatable.lambda.runtime.fiber.Result;
-import com.jnape.palatable.lambda.runtime.fiber.Scheduler;
+import com.jnape.palatable.lambda.effect.io.fiber.Fiber;
+import com.jnape.palatable.lambda.effect.io.fiber.Canceller;
+import com.jnape.palatable.lambda.effect.io.fiber.Result;
+import com.jnape.palatable.lambda.effect.io.fiber.Scheduler;
 import org.hamcrest.Description;
 import org.hamcrest.Matcher;
 import org.hamcrest.TypeSafeMatcher;
 
 import java.util.concurrent.CompletableFuture;
 
-import static com.jnape.palatable.lambda.runtime.fiber.testsupport.scheduler.SameThreadScheduler.sameThreadScheduler;
+import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.scheduler.SameThreadScheduler.sameThreadScheduler;
 import static org.hamcrest.Matchers.equalTo;
 
 public final class FiberResultMatcher<A> extends TypeSafeMatcher<Fiber<A>> {

@@ -1,6 +1,6 @@
 package research.fiber.scheduler.testsupport;
 
-import com.jnape.palatable.lambda.runtime.fiber.Scheduler;
+import com.jnape.palatable.lambda.effect.io.fiber.Scheduler;
 
 public final class ExplodingScheduler implements Scheduler {
     private static final ExplodingScheduler INSTANCE = new ExplodingScheduler();
