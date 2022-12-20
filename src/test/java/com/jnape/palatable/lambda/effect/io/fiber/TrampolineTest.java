@@ -49,6 +49,8 @@ public class TrampolineTest {
         assertFiber(fiber((Runnable) () -> {throw CAUSE;}), failure(CAUSE));
     }
 
+
+
     private static <A> void assertFiber(Fiber<A> fiber, Result<A> expected) {
         assertEquals(expected, new CompletableFuture<Result<A>>() {{
             TRAMPOLINE.unsafeRunAsync(fiber, this::complete);

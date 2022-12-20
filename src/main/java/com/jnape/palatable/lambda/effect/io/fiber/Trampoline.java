@@ -37,10 +37,10 @@ public final class Trampoline implements Runtime {
                 callback.accept(stackDepth, value.result());
             } else if (fiber instanceof Suspension<A> suspension) {
                 suspension.k().accept((Consumer<Result<A>>) res -> callback.accept(stackDepth, res));
-            } else if (fiber instanceof Race<A> race) {
-                race(canceller, callback, race);
             } else if (fiber instanceof Forever<A> forever) {
                 forever(forever, canceller, callback, stackDepth);
+            } else if (fiber instanceof Race<A> race) {
+                race(canceller, callback, race);
             } else if (fiber instanceof Bind<?, A> bind) {
                 bind(bind, canceller, callback, stackDepth);
             } else {
