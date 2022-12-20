@@ -2,7 +2,6 @@ package com.jnape.palatable.lambda.effect.io.fiber.benchmark;
 
 import com.jnape.palatable.lambda.adt.Unit;
 import com.jnape.palatable.lambda.effect.io.fiber.Fiber;
-import com.jnape.palatable.lambda.effect.io.fiber.Trampoline;
 
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
@@ -10,6 +9,7 @@ import java.util.concurrent.ForkJoinPool;
 import static com.jnape.palatable.lambda.effect.io.fiber.Canceller.canceller;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.fiber;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.forever;
+import static com.jnape.palatable.lambda.effect.io.fiber.Trampoline.trampoline;
 import static com.jnape.palatable.lambda.effect.io.fiber.benchmark.Sample.sample;
 import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.scheduler.SameThreadScheduler.sameThreadScheduler;
 import static com.jnape.palatable.lambda.functions.builtin.fn3.Times.times;
@@ -36,7 +36,7 @@ public class FiberBenchmark {
         public static final class Forever {
             public static void main(String[] args) {
                 Sample sample = sample(format("Fiber (%s)", Trampolined.class.getSimpleName()), 10_000_000L, MICROSECONDS);
-                new Trampoline(sameThreadScheduler()).unsafeRunAsync(forever(fiber(sample::mark)), System.out::println);
+                trampoline(sameThreadScheduler()).unsafeRunAsync(forever(fiber(sample::mark)), System.out::println);
             }
         }
 
@@ -47,7 +47,7 @@ public class FiberBenchmark {
                 Fiber<Unit> fiber   = fiber(sample::mark);
                 Fiber<Unit> forever = times(100_000, f -> f.bind(__ -> f), fiber);
 
-                new Trampoline(sameThreadScheduler()).unsafeRunAsync(forever, System.out::println);
+                trampoline(sameThreadScheduler()).unsafeRunAsync(forever, System.out::println);
             }
         }
 
@@ -62,7 +62,7 @@ public class FiberBenchmark {
                 Fiber<Unit> fiber   = fiber(sample::mark);
                 Fiber<Unit> forever = foreverBind(times(100_000, f -> f.bind(__ -> f), fiber));
 
-                new Trampoline(ForkJoinPool.commonPool()::execute).unsafeRunAsync(forever, System.out::println);
+                trampoline(ForkJoinPool.commonPool()::execute).unsafeRunAsync(forever, System.out::println);
                 Thread.currentThread().join();
             }
         }

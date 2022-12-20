@@ -1,18 +1,26 @@
 package com.jnape.palatable.lambda.effect.io.fiber;
 
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import static com.jnape.palatable.lambda.effect.io.fiber.Canceller.canceller;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.cancellation;
 
-public record Trampoline(Scheduler defaultScheduler) implements Runtime {
-    private static final int maxFiberRecursionDepth = 512;
+public final class Trampoline implements Runtime {
+    private static final int maxStackDepth = 512;
+
+    private final Scheduler defaultScheduler;
+
+    private Trampoline(Scheduler defaultScheduler) {
+        this.defaultScheduler = defaultScheduler;
+    }
 
     @Override
     public <A> void unsafeRunAsync(Fiber<A> fiber, Consumer<? super Result<A>> callback) {
-        tick(fiber, Canceller.canceller(), (__, res) -> callback.accept(res), 0);
+        tick(fiber, canceller(), (__, res) -> callback.accept(res), 0);
     }
 
     private <A> void tick(Fiber<A> fiber, Canceller canceller, BiConsumer<? super Integer, ? super Result<A>> callback,
@@ -20,7 +28,7 @@ public record Trampoline(Scheduler defaultScheduler) implements Runtime {
         if (canceller.cancelled()) {
             callback.accept(stackDepth, Result.cancellation());
         } else {
-            if (stackDepth == maxFiberRecursionDepth) {
+            if (stackDepth == maxStackDepth) {
                 schedule(fiber, canceller, callback);
                 return;
             }
@@ -30,10 +38,7 @@ public record Trampoline(Scheduler defaultScheduler) implements Runtime {
             } else if (fiber instanceof Suspension<A> suspension) {
                 suspension.k().accept((Consumer<Result<A>>) res -> callback.accept(stackDepth, res));
             } else if (fiber instanceof Race<A> race) {
-                Canceller     child  = canceller.addChild();
-                AtomicBoolean winner = new AtomicBoolean(true);
-                race(race.fiberA(), child, callback, winner);
-                race(race.fiberB(), child, callback, winner);
+                race(canceller, callback, race);
             } else if (fiber instanceof Forever<A> forever) {
                 forever(forever, canceller, callback, stackDepth);
             } else if (fiber instanceof Bind<?, A> bind) {
@@ -41,6 +46,20 @@ public record Trampoline(Scheduler defaultScheduler) implements Runtime {
             } else {
                 throw new Error("not yet here");
             }
+        }
+    }
+
+    private <A> void race(Canceller canceller, BiConsumer<? super Integer, ? super Result<A>> callback,
+                          Race<A> race) {
+        Canceller     child  = canceller.addChild();
+        AtomicBoolean winner = new AtomicBoolean(true);
+        for (Fiber<A> fiber : List.of(race.fiberA(), race.fiberB())) {
+            schedule(fiber, child, (stackDepth, res) -> {
+                if (winner.getAndSet(false)) {
+                    child.cancel();
+                    callback.accept(stackDepth + 1, res);
+                }
+            });
         }
     }
 
@@ -93,6 +112,10 @@ public record Trampoline(Scheduler defaultScheduler) implements Runtime {
                 finalCallback.accept(sd, cancellation());
             }
         }, stackDepth + 1);
+    }
+
+    public static Trampoline trampoline(Scheduler defaultScheduler) {
+        return new Trampoline(defaultScheduler);
     }
 
     private static <A> Bind<?, A> rightAssociated(Bind<?, A> bind) {

@@ -43,8 +43,8 @@ public sealed interface Fiber<A> {
         return Value.SUCCESS_UNIT;
     }
 
-    static <A> Fiber<A> failed(Throwable t) {
-        return result(failure(t));
+    static <A> Fiber<A> failed(Throwable cause) {
+        return result(failure(cause));
     }
 
     static <A> Fiber<A> race(Fiber<A> fiberA, Fiber<A> fiberB) {
