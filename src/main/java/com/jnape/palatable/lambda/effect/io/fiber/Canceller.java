@@ -7,31 +7,16 @@ import java.util.concurrent.atomic.AtomicReference;
 import static com.jnape.palatable.lambda.effect.io.fiber.CancelState.fresh;
 import static com.jnape.palatable.shoki.impl.HashSet.hashSet;
 
-public sealed interface Canceller permits ThreadSafeCancelTree {
-
-    void cancel();
-
-    boolean cancelled();
-
-    Canceller addChild();
-
-    void removeChild(Canceller child);
-
-    static Canceller canceller() {
-        return new ThreadSafeCancelTree(null);
-    }
-}
-
-final class ThreadSafeCancelTree implements Canceller {
+public final class Canceller {
 
     private final Canceller                    parent;
-    private final AtomicReference<CancelState> stateRef = new AtomicReference<>(fresh());
+    private final AtomicReference<CancelState> stateRef;
 
-    ThreadSafeCancelTree(Canceller parent) {
-        this.parent = parent;
+    private Canceller(Canceller parent, AtomicReference<CancelState> stateRef) {
+        this.parent   = parent;
+        this.stateRef = stateRef;
     }
 
-    @Override
     public void cancel() {
         CancelState cancelState = stateRef.getAndSet(CancelState.cancelled());
         if (!cancelState.isCancelled()) {
@@ -41,14 +26,12 @@ final class ThreadSafeCancelTree implements Canceller {
         }
     }
 
-    @Override
     public boolean cancelled() {
         return stateRef.get().isCancelled();
     }
 
-    @Override
     public Canceller addChild() {
-        ThreadSafeCancelTree child = new ThreadSafeCancelTree(this);
+        Canceller child = canceller(this);
         return stateRef
                        .updateAndGet(cs -> cs.addChild(child))
                        .isCancelled()
@@ -56,9 +39,16 @@ final class ThreadSafeCancelTree implements Canceller {
                : child;
     }
 
-    @Override
     public void removeChild(Canceller child) {
         stateRef.updateAndGet(cs -> cs.removeChild(child));
+    }
+
+    public static Canceller canceller() {
+        return canceller(null);
+    }
+
+    private static Canceller canceller(Canceller parent) {
+        return new Canceller(parent, new AtomicReference<>(fresh()));
     }
 }
 

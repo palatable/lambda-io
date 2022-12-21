@@ -33,6 +33,7 @@ public final class Trampoline implements Runtime {
                 return;
             }
 
+            //todo: compare with switch and enum
             if (fiber instanceof Value<A> value) {
                 callback.accept(stackDepth, value.result());
             } else if (fiber instanceof Suspension<A> suspension) {
@@ -43,9 +44,7 @@ public final class Trampoline implements Runtime {
                 race(canceller, callback, race);
             } else if (fiber instanceof Bind<?, A> bind) {
                 bind(bind, canceller, callback, stackDepth);
-            } else {
-                throw new Error("not yet here");
-            }
+            } // else Never
         }
     }
 
