@@ -10,6 +10,7 @@ import static com.jnape.palatable.lambda.effect.io.fiber.Canceller.canceller;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.cancellation;
 
 public final class Trampoline implements Runtime {
+    //todo: configurable by environment?
     private static final int maxStackDepth = 512;
 
     private final Scheduler defaultScheduler;
