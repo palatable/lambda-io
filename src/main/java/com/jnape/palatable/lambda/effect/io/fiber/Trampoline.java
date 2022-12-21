@@ -78,16 +78,6 @@ public final class Trampoline implements Runtime {
         }, stackDepth + 1);
     }
 
-    private <A> void race(Fiber<A> fiber, Canceller child, BiConsumer<? super Integer, ? super Result<A>> callback,
-                          AtomicBoolean winner) {
-        schedule(fiber, child, (stackDepth, res) -> {
-            if (winner.getAndSet(false)) {
-                child.cancel();
-                callback.accept(stackDepth + 1, res);
-            }
-        });
-    }
-
     private <A> void schedule(Fiber<A> fiber, Canceller canceller,
                               BiConsumer<? super Integer, ? super Result<A>> callback) {
         defaultScheduler.schedule(() -> tick(fiber, canceller, callback, 0));
