@@ -4,30 +4,32 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import java.util.function.Function;
+import java.util.function.Supplier;
 
-import static com.jnape.palatable.lambda.effect.io.fiber.Canceller.canceller;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.cancellation;
 
+//todo: Fiber.pin
+//todo: configurable maxStackDepth
 public final class Trampoline implements Runtime {
-    //todo: configurable by environment?
     private static final int maxStackDepth = 512;
 
-    private final Scheduler defaultScheduler;
+    private final Supplier<Canceller> freshCanceller;
+    private final Scheduler           defaultScheduler;
 
-    private Trampoline(Scheduler defaultScheduler) {
+    private Trampoline(Supplier<Canceller> freshCanceller, Scheduler defaultScheduler) {
+        this.freshCanceller   = freshCanceller;
         this.defaultScheduler = defaultScheduler;
     }
 
     @Override
     public <A> void unsafeRunAsync(Fiber<A> fiber, Consumer<? super Result<A>> callback) {
-        tick(fiber, canceller(), (__, res) -> callback.accept(res), 0);
+        schedule(fiber, freshCanceller.get(), (__, res) -> callback.accept(res));
     }
 
     private <A> void tick(Fiber<A> fiber, Canceller canceller, BiConsumer<? super Integer, ? super Result<A>> callback,
                           int stackDepth) {
         if (canceller.cancelled()) {
-            callback.accept(stackDepth, Result.cancellation());
+            callback.accept(stackDepth, cancellation());
         } else {
             if (stackDepth == maxStackDepth) {
                 schedule(fiber, canceller, callback);
@@ -38,6 +40,7 @@ public final class Trampoline implements Runtime {
             if (fiber instanceof Value<A> value) {
                 callback.accept(stackDepth, value.result());
             } else if (fiber instanceof Suspension<A> suspension) {
+                //todo: should this be wrapped in try/catch and re-throw as critical error?
                 suspension.k().accept((Consumer<Result<A>>) res -> callback.accept(stackDepth, res));
             } else if (fiber instanceof Forever<A> forever) {
                 forever(forever, canceller, callback, stackDepth);
@@ -54,6 +57,7 @@ public final class Trampoline implements Runtime {
         Canceller     child  = canceller.addChild();
         AtomicBoolean winner = new AtomicBoolean(true);
         for (Fiber<A> fiber : List.of(race.fiberA(), race.fiberB())) {
+            //todo: replace with tick
             schedule(fiber, child, (stackDepth, res) -> {
                 if (winner.getAndSet(false)) {
                     child.cancel();
@@ -86,8 +90,7 @@ public final class Trampoline implements Runtime {
 
     private <A> void bind(Bind<?, A> bind, Canceller canceller,
                           BiConsumer<? super Integer, ? super Result<A>> callback, int stackDepth) {
-        //todo: scan two nested binds ahead before re-association for specialized #forever() case?
-        tick0((Bind<?, A>) (bind.fiberZ() instanceof Bind<?, ?> ? rightAssociated(bind) : bind),
+        tick0((Bind<?, A>) (bind.fiberZ() instanceof Bind<?, ?> ? bind.rightAssociated() : bind),
               canceller, callback, stackDepth);
     }
 
@@ -104,25 +107,11 @@ public final class Trampoline implements Runtime {
         }, stackDepth + 1);
     }
 
-    public static Trampoline trampoline(Scheduler defaultScheduler) {
-        return new Trampoline(defaultScheduler);
+    public static Trampoline trampoline(Supplier<Canceller> freshCanceller, Scheduler defaultScheduler) {
+        return new Trampoline(freshCanceller, defaultScheduler);
     }
 
-    private static <A> Bind<?, A> rightAssociated(Bind<?, A> bind) {
-        Bind<?, A> rightAssociated = bind;
-        while (rightAssociated.fiberZ() instanceof Bind<?, ?>) {
-            rightAssociated = rightAssociated.eliminate(new Bind.Eliminator<>() {
-                @Override
-                public <Z> Bind<?, A> eliminate(Fiber<Z> fiber, Function<? super Z, ? extends Fiber<A>> f) {
-                    return ((Bind<?, Z>) fiber).eliminate(new Bind.Eliminator<>() {
-                        @Override
-                        public <Y> Bind<?, A> eliminate(Fiber<Y> fiberY, Function<? super Y, ? extends Fiber<Z>> g) {
-                            return new Bind<>(fiberY, y -> new Bind<>(g.apply(y), f));
-                        }
-                    });
-                }
-            });
-        }
-        return rightAssociated;
+    public static Trampoline trampoline(Scheduler defaultScheduler) {
+        return trampoline(Canceller::canceller, defaultScheduler);
     }
 }

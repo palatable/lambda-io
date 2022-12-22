@@ -1,33 +1,16 @@
 package research.lambda.effect.io.fiber;
 
-import com.jnape.palatable.lambda.adt.Unit;
-import com.jnape.palatable.lambda.functions.Fn0;
-import com.jnape.palatable.lambda.functions.Fn1;
-import com.jnape.palatable.lambda.functions.specialized.SideEffect;
+import com.jnape.palatable.lambda.effect.io.fiber.Canceller;
 import com.jnape.palatable.lambda.effect.io.fiber.Result;
 import com.jnape.palatable.lambda.effect.io.fiber.Scheduler;
-import research.lambda.runtime.fiber.Canceller;
 import research.lambda.runtime.fiber.internal.Array;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
-import static com.jnape.palatable.lambda.adt.Unit.UNIT;
-
 public interface Fiber<A> {
 
     void execute(Scheduler scheduler, Canceller cancel, Consumer<? super Result<A>> callback);
-
-    static <A> Fiber<A> fiber(Fn0<? extends A> f) {
-        return (scheduler, c, callback) -> callback.accept(Result.success(f.apply()));
-    }
-
-    static Fiber<Unit> fiber(SideEffect sideEffect) {
-        return fiber(() -> {
-            sideEffect.Ω();
-            return UNIT;
-        });
-    }
 
     @SafeVarargs
     static <A> Fiber<Array<A>> parallel(Fiber<A>... fibers) {
@@ -68,42 +51,3 @@ public interface Fiber<A> {
 
 }
 
-record Bind<Z, A>(Fiber<Z> fiberZ, Fn1<? super Z, ? extends Fiber<A>> f) implements Fiber<A> {
-
-    @Override
-    public void execute(Scheduler scheduler, Canceller cancel, Consumer<? super Result<A>> callback) {
-        tick(this, scheduler, callback, cancel, 1);
-    }
-
-    private static final int stackFrameTransplantDepth = 512;
-
-    public static <Z, A> void tick(Bind<Z, A> bind, Scheduler scheduler, Consumer<? super Result<A>> ultimateCallback,
-                                   Canceller cancel, int stackDepth) {
-        if (cancel.cancelled()) {
-            ultimateCallback.accept(Result.cancellation());
-            return;
-        }
-        bind.fiberZ().execute(scheduler, cancel, resultZ -> {
-            if (resultZ instanceof Result.Cancellation<Z>) {
-                ultimateCallback.accept(Result.cancellation());
-            } else if (resultZ instanceof Result.Success<Z> successZ) {
-                try {
-                    Fiber<A> fiberA = bind.f().apply(successZ.value());
-                    if (fiberA instanceof Bind<?, A> bindA) {
-                        if (stackDepth == stackFrameTransplantDepth) scheduler.schedule(() -> bindA.execute(scheduler, cancel, ultimateCallback));
-                        else {
-                            tick(bindA, scheduler, ultimateCallback, cancel, stackDepth + 1);
-                        }
-                    } else {
-                        if (stackDepth == stackFrameTransplantDepth) scheduler.schedule(() -> fiberA.execute(scheduler, cancel, ultimateCallback));
-                        else fiberA.execute(scheduler, cancel, ultimateCallback);
-                    }
-                } catch (Throwable t) {
-                    ultimateCallback.accept(Result.failure(new ExceptionOutsideOfFiber(t)));
-                }
-            } else {
-                ultimateCallback.accept(((Result.Failure<Z>) resultZ).contort());
-            }
-        });
-    }
-}

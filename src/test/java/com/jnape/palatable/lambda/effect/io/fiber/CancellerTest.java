@@ -30,7 +30,7 @@ public class CancellerTest {
     }
 
     @Test
-    public void IsCancelledAfterCallingCancel() {
+    public void isCancelledAfterCallingCancel() {
         canceller.cancel();
         assertTrue(canceller.cancelled());
     }

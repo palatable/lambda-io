@@ -1,10 +1,10 @@
 package com.jnape.palatable.lambda.effect.io.fiber.testsupport.matcher;
 
-import com.jnape.palatable.lambda.effect.io.fiber.Fiber;
-import com.jnape.palatable.lambda.internal.Runtime;
 import com.jnape.palatable.lambda.effect.io.fiber.Canceller;
+import com.jnape.palatable.lambda.effect.io.fiber.Fiber;
 import com.jnape.palatable.lambda.effect.io.fiber.Result;
 import com.jnape.palatable.lambda.effect.io.fiber.Scheduler;
+import com.jnape.palatable.lambda.internal.Runtime;
 import org.hamcrest.Description;
 import org.hamcrest.TypeSafeMatcher;
 
@@ -12,6 +12,8 @@ import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
 
+import static com.jnape.palatable.lambda.effect.io.fiber.Canceller.canceller;
+import static com.jnape.palatable.lambda.effect.io.fiber.Trampoline.trampoline;
 import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.scheduler.SameThreadScheduler.sameThreadScheduler;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
@@ -30,10 +32,10 @@ public final class FiberTimeoutMatcher<A> extends TypeSafeMatcher<Fiber<? extend
     }
 
     @Override
-    protected boolean matchesSafely(Fiber<? extends A> fiber) {
+    protected synchronized boolean matchesSafely(Fiber<? extends A> fiber) {
         if (result == null)
             result = new CompletableFuture<>() {{
-                fiber.execute(scheduler, canceller, this::complete);
+                trampoline(() -> canceller, scheduler).unsafeRunAsync(fiber, this::complete);
             }};
 
         try {
@@ -63,7 +65,7 @@ public final class FiberTimeoutMatcher<A> extends TypeSafeMatcher<Fiber<? extend
     }
 
     public static <A> FiberTimeoutMatcher<A> timesOutAfter(Scheduler scheduler, Duration duration) {
-        return timesOutAfter(scheduler, Canceller.canceller(), duration);
+        return timesOutAfter(scheduler, canceller(), duration);
     }
 
     public static <A> FiberTimeoutMatcher<A> timesOutAfter(Canceller canceller, Duration duration) {
@@ -71,6 +73,6 @@ public final class FiberTimeoutMatcher<A> extends TypeSafeMatcher<Fiber<? extend
     }
 
     public static <A> FiberTimeoutMatcher<A> timesOutAfter(Duration duration) {
-        return timesOutAfter(Canceller.canceller(), duration);
+        return timesOutAfter(canceller(), duration);
     }
 }
