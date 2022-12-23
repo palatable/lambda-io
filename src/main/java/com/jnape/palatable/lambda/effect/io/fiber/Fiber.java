@@ -101,6 +101,7 @@ record Bind<Z, A>(Fiber<Z> fiberZ, Function<? super Z, ? extends Fiber<A>> f) im
         return eliminator.eliminate(fiberZ, f);
     }
 
+    //todo: compare with efficiency of old lambda IO approach of an untyped list storing arrows
     public Bind<?, A> rightAssociated() {
         Bind<?, A> rightAssociated = this;
         Bind.Eliminator<A, Bind<?, A>> eliminator = new Bind.Eliminator<>() {

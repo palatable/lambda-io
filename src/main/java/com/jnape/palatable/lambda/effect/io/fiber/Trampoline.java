@@ -57,7 +57,6 @@ public final class Trampoline implements Runtime {
         Canceller     child  = canceller.addChild();
         AtomicBoolean winner = new AtomicBoolean(true);
         for (Fiber<A> fiber : List.of(race.fiberA(), race.fiberB())) {
-            //todo: replace with tick
             schedule(fiber, child, (stackDepth, res) -> {
                 if (winner.getAndSet(false)) {
                     child.cancel();
