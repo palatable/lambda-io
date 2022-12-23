@@ -1,5 +1,6 @@
 package com.jnape.palatable.lambda.effect.io.fiber;
 
+import com.jnape.palatable.lambda.functions.Fn1;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
@@ -40,6 +41,8 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 public class TrampolineTest {
 
+    private static final RuntimeException CAUSE = new RuntimeException("blew up");
+
     @Nested
     public class Value {
 
@@ -58,8 +61,7 @@ public class TrampolineTest {
 
         @Test
         public void failedConvenienceMethod() {
-            RuntimeException cause = new RuntimeException("kaboom");
-            assertThat(failed(cause), yieldsResult(failure(cause)));
+            assertThat(failed(CAUSE), yieldsResult(failure(CAUSE)));
         }
 
         @Test
@@ -96,24 +98,22 @@ public class TrampolineTest {
 
         @Test
         public void catchesThrowableFromFunction() {
-            RuntimeException throwable = new IllegalStateException("blew up");
             assertThat(fiber(() -> {
-                throw throwable;
-            }), yieldsResult(equalTo(failure(throwable))));
+                throw CAUSE;
+            }), yieldsResult(equalTo(failure(CAUSE))));
         }
 
         @Test
         public void doesNotCatchThrowableFromCallback() {
-            Throwable     throwable         = new Exception("blew up");
             AtomicInteger invocationCounter = new AtomicInteger(0);
             try {
                 trampoline(Runnable::run).unsafeRunAsync(fiber(() -> 1), res -> {
                     invocationCounter.incrementAndGet();
-                    throw throwChecked(throwable);
+                    throw throwChecked(CAUSE);
                 });
                 fail("Expected callback to throw, but didn't.");
             } catch (Throwable thrown) {
-                assertSame(throwable, thrown, "Expected to throw throwable, but threw <" + thrown + ">");
+                assertSame(CAUSE, thrown, "Expected to throw throwable, but threw <" + thrown + ">");
                 int invocations = invocationCounter.get();
                 assertEquals(1, invocations, "Expected exactly one invocation of callback, but there were <"
                         + invocations + ">");
@@ -134,28 +134,53 @@ public class TrampolineTest {
     }
 
     @Nested
-    //todo: failure and cancellation cases
     public class Bind {
 
         @Test
-        //todo: huh?
-        public void cancellationPreemptsBind() {
+        public void happyPath() {
             assertThat(fiber(() -> 1).bind(x -> fiber(() -> x + 1)),
                        yieldsResult(equalTo(success(2))));
+        }
+
+        @Test
+        public void failurePreemptsSubsequentBinds() {
+            AtomicBoolean downstreamCalled = new AtomicBoolean(false);
+            assertThat(fiber(() -> {throw CAUSE;}).bind(x -> fiber(() -> downstreamCalled.set(true))),
+                       yieldsResult(failure(CAUSE)));
+            assertFalse(downstreamCalled.get());
+        }
+
+        @Test
+        public void cancellationPreemptsSubsequentBinds() {
+            AtomicBoolean downstreamCalled = new AtomicBoolean(false);
+            assertThat(Fiber.cancelled().bind(x -> fiber(() -> downstreamCalled.set(true))),
+                       yieldsResult(cancellation()));
+            assertFalse(downstreamCalled.get());
         }
 
         @Nested
         @Tag("safety:stack")
         public class StackSafety {
 
+            private static final int STACK_EXPLODING_NUMBER = 50_000;
+
             @Test
-            public void leftBind() {
-                int n = 50_000;
-                assertThat(times(n, f -> f.bind(x -> fiber(() -> x + 1)), succeeded(0)),
-                           yieldsResult(equalTo(success(n))));
+            public void deeplyLeftAssociated() {
+                assertThat(times(STACK_EXPLODING_NUMBER, f -> f.bind(x -> fiber(() -> x + 1)), succeeded(0)),
+                           yieldsResult(equalTo(success(STACK_EXPLODING_NUMBER))));
             }
 
-            //todo: right bind, mixed bind
+            @Test
+            public void deeplyRightAssociated() {
+                assertThat(Fn1.<Integer, Fiber<Integer>>withSelf(
+                                           (f, i) -> i == STACK_EXPLODING_NUMBER
+                                                     ? succeeded(0)
+                                                     : succeeded(1)
+                                                             .bind(x -> f.apply(i + 1)
+                                                                     .bind(y -> succeeded(x + y))))
+                                   .apply(0),
+                           yieldsResult(equalTo(success(STACK_EXPLODING_NUMBER))));
+            }
         }
     }
 
