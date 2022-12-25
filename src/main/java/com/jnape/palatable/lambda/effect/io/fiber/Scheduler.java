@@ -2,7 +2,6 @@ package com.jnape.palatable.lambda.effect.io.fiber;
 
 import java.util.concurrent.Executor;
 
-//todo: delay
 public interface Scheduler {
 
     void schedule(Runnable runnable);
