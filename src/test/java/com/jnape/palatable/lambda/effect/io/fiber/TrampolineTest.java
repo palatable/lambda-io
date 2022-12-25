@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -24,11 +23,14 @@ import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.succeeded;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.cancellation;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.failure;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.success;
+import static com.jnape.palatable.lambda.effect.io.fiber.Scheduler.scheduler;
 import static com.jnape.palatable.lambda.effect.io.fiber.Trampoline.trampoline;
 import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.matcher.FiberResultMatcher.yieldsResult;
 import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.matcher.FiberTimeoutMatcher.timesOutAfter;
+import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.scheduler.SameThreadScheduler.sameThreadScheduler;
 import static com.jnape.palatable.lambda.functions.builtin.fn3.Times.times;
 import static com.jnape.palatable.lambda.internal.Runtime.throwChecked;
+import static java.util.concurrent.Executors.newFixedThreadPool;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.sameInstance;
@@ -107,7 +109,7 @@ public class TrampolineTest {
         public void doesNotCatchThrowableFromCallback() {
             AtomicInteger invocationCounter = new AtomicInteger(0);
             try {
-                trampoline(Runnable::run).unsafeRunAsync(fiber(() -> 1), res -> {
+                trampoline(sameThreadScheduler()).unsafeRunAsync(fiber(() -> 1), res -> {
                     invocationCounter.incrementAndGet();
                     throw throwChecked(CAUSE);
                 });
@@ -240,7 +242,7 @@ public class TrampolineTest {
                 } catch (InterruptedException ignored) {
                 }
                 return 2;
-            })), yieldsResult(Executors.newFixedThreadPool(2)::execute, equalTo(success(2))));
+            })), yieldsResult(scheduler(newFixedThreadPool(2)), equalTo(success(2))));
         }
     }
 

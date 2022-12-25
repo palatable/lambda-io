@@ -2,13 +2,14 @@ package com.jnape.palatable.lambda.effect.io.fiber.benchmark;
 
 import com.jnape.palatable.lambda.adt.Unit;
 import com.jnape.palatable.lambda.effect.io.fiber.Fiber;
+import com.jnape.palatable.lambda.effect.io.fiber.Scheduler;
 
-import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
 
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.fiber;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.forever;
+import static com.jnape.palatable.lambda.effect.io.fiber.Scheduler.scheduler;
 import static com.jnape.palatable.lambda.effect.io.fiber.Trampoline.trampoline;
 import static com.jnape.palatable.lambda.effect.io.fiber.benchmark.Sample.sample;
 import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.scheduler.SameThreadScheduler.sameThreadScheduler;
@@ -23,9 +24,9 @@ import static java.util.concurrent.TimeUnit.MICROSECONDS;
 //todo: transliterate into JMH
 public class FiberBenchmark {
 
-    private static void doSample(Class<?> clazz, Executor executor) {
+    private static void doSample(Class<?> clazz, Scheduler scheduler) {
         Sample sample = sample(format("Fiber (%s)", clazz.getSimpleName()), 100_000_000L, MICROSECONDS);
-        trampoline(executor::execute).unsafeRunAsync(forever(fiber(sample::mark)), System.out::println);
+        trampoline(scheduler).unsafeRunAsync(forever(fiber(sample::mark)), System.out::println);
     }
 
     public static final class SameThread {
@@ -40,7 +41,7 @@ public class FiberBenchmark {
         [main] Sample <Conditional (SameThread)>: 300000000 (138.391571/us average, 2167762us elapsed)
          */
         public static void main(String[] args) {
-            doSample(SameThread.class, sameThreadScheduler()::schedule);
+            doSample(SameThread.class, sameThreadScheduler());
         }
     }
 
@@ -56,7 +57,7 @@ public class FiberBenchmark {
         [pool-1-thread-1] Sample <Conditional (Forked_SingleThreaded)>: 300000000 (149.430145/us average, 2007627us elapsed)
          */
         public static void main(String[] args) {
-            doSample(Forked_SingleThreaded.class, newSingleThreadExecutor());
+            doSample(Forked_SingleThreaded.class, scheduler(newSingleThreadExecutor()));
         }
     }
 
@@ -72,7 +73,7 @@ public class FiberBenchmark {
         [pool-1-thread-2] Sample <Conditional (Forked_FixedMultiThreadedPool)>: 300000000 (125.488777/us average, 2390652us elapsed)
          */
         public static void main(String[] args) {
-            doSample(Forked_FixedMultiThreadedPool.class, newFixedThreadPool(3));
+            doSample(Forked_FixedMultiThreadedPool.class, scheduler(newFixedThreadPool(3)));
         }
     }
 
@@ -88,7 +89,7 @@ public class FiberBenchmark {
         [pool-1-thread-3] Sample <Conditional (Forked_ElasticPool)>: 300000000 (83.900452/us average, 3575666us elapsed)
          */
         public static void main(String[] args) {
-            doSample(Forked_ElasticPool.class, newCachedThreadPool());
+            doSample(Forked_ElasticPool.class, scheduler(newCachedThreadPool()));
         }
     }
 
@@ -100,7 +101,7 @@ public class FiberBenchmark {
         [ForkJoinPool-1-worker-4] Sample <Fiber (Forked_WorkStealingPool)>: 300000000 (102.799965/us average, 2918289us elapsed)
          */
         public static void main(String[] args) throws InterruptedException {
-            doSample(Forked_WorkStealingPool.class, Executors.newWorkStealingPool());
+            doSample(Forked_WorkStealingPool.class, scheduler(Executors.newWorkStealingPool()));
             currentThread().join();
         }
     }
@@ -118,7 +119,7 @@ public class FiberBenchmark {
         [ForkJoinPool.commonPool-worker-3] Sample <Conditional (Forked_ElasticPool)>: 300000000 (89.057030/us average, 3368628us elapsed)
          */
         public static void main(String[] args) throws InterruptedException {
-            doSample(Forked_ElasticPool.class, ForkJoinPool.commonPool());
+            doSample(Forked_ElasticPool.class, scheduler(ForkJoinPool.commonPool()));
             currentThread().join();
         }
     }
