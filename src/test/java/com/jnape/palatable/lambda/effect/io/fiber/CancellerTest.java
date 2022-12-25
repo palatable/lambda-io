@@ -4,6 +4,12 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -80,5 +86,36 @@ public class CancellerTest {
 
         child2.cancel();
         assertTrue(child2.cancelled());
+    }
+
+    @Test
+    public void cancelCallbacksAreFiredInOrder() {
+        List<String> interactions = new ArrayList<>();
+        assertTrue(canceller.onCancellation(() -> interactions.add("first")));
+        assertTrue(canceller.onCancellation(() -> interactions.add("second")));
+        assertEquals(emptyList(), interactions);
+        canceller.cancel();
+        assertEquals(List.of("first", "second"), interactions);
+    }
+
+    @Test
+    public void failuresInCancellationCallbacksDoNotInterfere() {
+        List<String> interactions = new ArrayList<>();
+        assertTrue(canceller.onCancellation(() -> {throw new IllegalStateException("kaboom");}));
+        assertTrue(canceller.onCancellation(() -> interactions.add("second")));
+        assertEquals(emptyList(), interactions);
+        canceller.cancel();
+        assertEquals(List.of("second"), interactions);
+    }
+
+    @Test
+    public void callbacksAddedAfterCancellationAreNotRegistered() {
+        List<String> interactions = new ArrayList<>();
+        assertTrue(canceller.onCancellation(() -> interactions.add("first")));
+        assertEquals(emptyList(), interactions);
+        canceller.cancel();
+        assertEquals(singletonList("first"), interactions);
+        assertFalse(canceller.onCancellation(() -> interactions.add("second")));
+        assertEquals(singletonList("first"), interactions);
     }
 }

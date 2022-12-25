@@ -1,11 +1,13 @@
 package com.jnape.palatable.lambda.effect.io.fiber;
 
 import com.jnape.palatable.shoki.impl.HashSet;
+import com.jnape.palatable.shoki.impl.StrictQueue;
 
 import java.util.concurrent.atomic.AtomicReference;
 
 import static com.jnape.palatable.lambda.effect.io.fiber.CancelState.fresh;
 import static com.jnape.palatable.shoki.impl.HashSet.hashSet;
+import static com.jnape.palatable.shoki.impl.StrictQueue.strictQueue;
 
 public final class Canceller {
 
@@ -17,9 +19,15 @@ public final class Canceller {
         this.stateRef = stateRef;
     }
 
+    public boolean onCancellation(Runnable callback) {
+        return !stateRef.updateAndGet(cs -> cs.addCallback(callback)).isCancelled();
+    }
+
     public void cancel() {
         CancelState cancelState = stateRef.getAndSet(CancelState.cancelled());
         if (!cancelState.isCancelled()) {
+            //todo: this will slow down cancel propagation -- consider relocating to shared FiberState or some such
+            cancelState.callbacks().forEach(c -> {try {c.run();} catch (Exception ignored) {}});
             cancelState.children().forEach(Canceller::cancel);
             if (parent != null)
                 parent.removeChild(this);
@@ -52,17 +60,21 @@ public final class Canceller {
     }
 }
 
-record CancelState(boolean isCancelled, HashSet<Canceller> children) {
+record CancelState(boolean isCancelled, HashSet<Canceller> children, StrictQueue<Runnable> callbacks) {
 
-    private static final CancelState CANCELLED = new CancelState(true, hashSet());
-    private static final CancelState FRESH     = new CancelState(false, hashSet());
+    private static final CancelState CANCELLED = new CancelState(true, hashSet(), strictQueue());
+    private static final CancelState FRESH     = new CancelState(false, hashSet(), strictQueue());
+
+    CancelState addCallback(Runnable callback) {
+        return isCancelled ? this : new CancelState(false, children, callbacks.snoc(callback));
+    }
 
     CancelState addChild(Canceller child) {
-        return isCancelled ? this : new CancelState(false, children.add(child));
+        return isCancelled ? this : new CancelState(false, children.add(child), callbacks);
     }
 
     CancelState removeChild(Canceller child) {
-        return new CancelState(isCancelled, children.remove(child));
+        return new CancelState(isCancelled, children.remove(child), callbacks);
     }
 
     public static CancelState fresh() {

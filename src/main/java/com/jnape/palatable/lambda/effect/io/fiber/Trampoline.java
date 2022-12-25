@@ -28,6 +28,7 @@ public final class Trampoline implements Runtime {
 
     private <A> void tick(Fiber<A> fiber, Canceller canceller, BiConsumer<? super Integer, ? super Result<A>> callback,
                           int stackDepth) {
+        //todo: consider scheduling this check every n ticks to boost performance
         if (canceller.cancelled()) {
             callback.accept(stackDepth, cancellation());
         } else {
