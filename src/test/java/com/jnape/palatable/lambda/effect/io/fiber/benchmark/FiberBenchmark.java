@@ -3,6 +3,7 @@ package com.jnape.palatable.lambda.effect.io.fiber.benchmark;
 import com.jnape.palatable.lambda.adt.Unit;
 import com.jnape.palatable.lambda.effect.io.fiber.Fiber;
 import com.jnape.palatable.lambda.effect.io.fiber.Scheduler;
+import com.jnape.palatable.lambda.effect.io.fiber.Timer;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
@@ -10,23 +11,30 @@ import java.util.concurrent.ForkJoinPool;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.fiber;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.forever;
 import static com.jnape.palatable.lambda.effect.io.fiber.Scheduler.scheduler;
+import static com.jnape.palatable.lambda.effect.io.fiber.Timer.timer;
 import static com.jnape.palatable.lambda.effect.io.fiber.Trampoline.trampoline;
 import static com.jnape.palatable.lambda.effect.io.fiber.benchmark.Sample.sample;
 import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.scheduler.SameThreadScheduler.sameThreadScheduler;
+import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.scheduler.SameThreadTimer.sameThreadTimer;
 import static com.jnape.palatable.lambda.functions.builtin.fn3.Times.times;
 import static java.lang.String.format;
 import static java.lang.Thread.currentThread;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 
 //todo: transliterate into JMH
 public class FiberBenchmark {
 
-    private static void doSample(Class<?> clazz, Scheduler scheduler) {
+    private static void doSample(Class<?> clazz, Scheduler scheduler, Timer timer) {
         Sample sample = sample(format("Fiber (%s)", clazz.getSimpleName()), 100_000_000L, MICROSECONDS);
-        trampoline(scheduler).unsafeRunAsync(forever(fiber(sample::mark)), System.out::println);
+        trampoline(scheduler, timer).unsafeRunAsync(forever(fiber(sample::mark)), System.out::println);
+    }
+
+    private static void doSample(Class<?> clazz, Scheduler scheduler) {
+        doSample(clazz, scheduler, timer(newSingleThreadScheduledExecutor()));
     }
 
     public static final class SameThread {
@@ -41,7 +49,7 @@ public class FiberBenchmark {
         [main] Sample <Conditional (SameThread)>: 300000000 (138.391571/us average, 2167762us elapsed)
          */
         public static void main(String[] args) {
-            doSample(SameThread.class, sameThreadScheduler());
+            doSample(SameThread.class, sameThreadScheduler(), sameThreadTimer());
         }
     }
 
@@ -133,7 +141,7 @@ public class FiberBenchmark {
                 Fiber<Unit> fiber   = fiber(sample::mark);
                 Fiber<Unit> forever = times(100_000, f -> f.bind(__ -> f), fiber);
 
-                trampoline(sameThreadScheduler()).unsafeRunAsync(forever, System.out::println);
+                trampoline(sameThreadScheduler(), sameThreadTimer()).unsafeRunAsync(forever, System.out::println);
             }
         }
 
@@ -148,7 +156,7 @@ public class FiberBenchmark {
                 Fiber<Unit> fiber   = fiber(sample::mark);
                 Fiber<Unit> forever = foreverBind(times(100_000, f -> f.bind(__ -> f), fiber));
 
-                trampoline(sameThreadScheduler()).unsafeRunAsync(forever, System.out::println);
+                trampoline(sameThreadScheduler(), sameThreadTimer()).unsafeRunAsync(forever, System.out::println);
                 Thread.currentThread().join();
             }
         }

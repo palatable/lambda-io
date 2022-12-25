@@ -14,6 +14,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.jnape.palatable.lambda.effect.io.fiber.Canceller.canceller;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.cancelled;
+import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.delay;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.failed;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.fiber;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.never;
@@ -28,6 +29,7 @@ import static com.jnape.palatable.lambda.effect.io.fiber.Trampoline.trampoline;
 import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.matcher.FiberResultMatcher.yieldsResult;
 import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.matcher.FiberTimeoutMatcher.timesOutAfter;
 import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.scheduler.SameThreadScheduler.sameThreadScheduler;
+import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.scheduler.SameThreadTimer.sameThreadTimer;
 import static com.jnape.palatable.lambda.functions.builtin.fn3.Times.times;
 import static com.jnape.palatable.lambda.internal.Runtime.throwChecked;
 import static java.util.concurrent.Executors.newFixedThreadPool;
@@ -106,10 +108,11 @@ public class TrampolineTest {
         }
 
         @Test
+        //todo: this isn't a reliable way to demonstrate the point...
         public void doesNotCatchThrowableFromCallback() {
             AtomicInteger invocationCounter = new AtomicInteger(0);
             try {
-                trampoline(sameThreadScheduler()).unsafeRunAsync(fiber(() -> 1), res -> {
+                trampoline(sameThreadScheduler(), sameThreadTimer()).unsafeRunAsync(fiber(() -> 1), res -> {
                     invocationCounter.incrementAndGet();
                     throw throwChecked(CAUSE);
                 });
@@ -267,4 +270,57 @@ public class TrampolineTest {
         }
     }
 
+    @Nested
+    public class Delay {
+
+        @Test
+        //todo: "schedules on timer then resumes on scheduler" indicates names here are improvable;
+        //      also, this test is just garbage, figure out a more robust way to demonstrate the assertion
+        public void schedulesOnTimerThenResumesOnScheduler() {
+            Fiber<Integer> delay      = delay(succeeded(1), Duration.ofNanos(1));
+            List<String>   boundaries = new ArrayList<>();
+            assertThat(delay, yieldsResult(
+                    r -> {
+                        boundaries.add("scheduler");
+                        r.run();
+                    }, (runnable, d, tu) -> {
+                        boundaries.add("timer: " + d + tu);
+                        runnable.run();
+                        return () -> {};
+                    }, canceller(), equalTo(success(1))
+            ));
+            assertEquals(List.of("scheduler", "timer: 1NANOSECONDS", "scheduler"), boundaries);
+        }
+
+        @Test
+        public void delayCallbackWiresIntoCancellation() {
+            Canceller      canceller      = canceller();
+            Fiber<Integer> delay          = delay(succeeded(1), Duration.ofNanos(1));
+            AtomicBoolean  callbackCalled = new AtomicBoolean(false);
+            assertThat(delay, yieldsResult(
+                    (runnable, d, tu) -> {
+                        runnable.run();
+                        return () -> callbackCalled.set(true);
+                    }, canceller, equalTo(success(1))
+            ));
+            assertFalse(callbackCalled.get());
+            canceller.cancel();
+            assertTrue(callbackCalled.get());
+        }
+
+        @Test
+        public void automaticallyCancelsIfFailsRegisteringCancelCallback() {
+            Canceller      canceller      = canceller();
+            Fiber<Integer> delay          = delay(succeeded(1), Duration.ofNanos(1));
+            AtomicBoolean  callbackCalled = new AtomicBoolean(false);
+            assertThat(delay, yieldsResult(
+                    (runnable, d, tu) -> {
+                        canceller.cancel();
+                        runnable.run();
+                        return () -> callbackCalled.set(true);
+                    }, canceller, equalTo(cancellation())
+            ));
+            assertTrue(callbackCalled.get());
+        }
+    }
 }

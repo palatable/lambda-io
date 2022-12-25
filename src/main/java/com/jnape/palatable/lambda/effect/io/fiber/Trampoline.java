@@ -15,10 +15,12 @@ public final class Trampoline implements Runtime {
 
     private final Supplier<Canceller> freshCanceller;
     private final Scheduler           defaultScheduler;
+    private final Timer               timer;
 
-    private Trampoline(Supplier<Canceller> freshCanceller, Scheduler defaultScheduler) {
+    private Trampoline(Supplier<Canceller> freshCanceller, Scheduler defaultScheduler, Timer timer) {
         this.freshCanceller   = freshCanceller;
         this.defaultScheduler = defaultScheduler;
+        this.timer            = timer;
     }
 
     @Override
@@ -49,6 +51,11 @@ public final class Trampoline implements Runtime {
                 race(canceller, callback, race);
             } else if (fiber instanceof Bind<?, A> bind) {
                 bind(bind, canceller, callback, stackDepth);
+            } else if (fiber instanceof Delay<A> delay) {
+                Runnable cancel = timer.delay(() -> schedule(delay.fiber(), canceller, callback),
+                                              delay.delay(), delay.timeUnit());
+                if (!canceller.onCancellation(cancel))
+                    cancel.run();
             } // else Never
         }
     }
@@ -107,11 +114,11 @@ public final class Trampoline implements Runtime {
         }, stackDepth + 1);
     }
 
-    public static Trampoline trampoline(Supplier<Canceller> freshCanceller, Scheduler defaultScheduler) {
-        return new Trampoline(freshCanceller, defaultScheduler);
+    public static Trampoline trampoline(Supplier<Canceller> freshCanceller, Scheduler defaultScheduler, Timer timer) {
+        return new Trampoline(freshCanceller, defaultScheduler, timer);
     }
 
-    public static Trampoline trampoline(Scheduler defaultScheduler) {
-        return trampoline(Canceller::canceller, defaultScheduler);
+    public static Trampoline trampoline(Scheduler defaultScheduler, Timer timer) {
+        return trampoline(Canceller::canceller, defaultScheduler, timer);
     }
 }

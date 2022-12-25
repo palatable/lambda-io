@@ -28,11 +28,14 @@ public final class SameThreadScheduler implements Scheduler {
         int n = 1024;
         new ArrayList<Runnable>(n) {{
             running = true;
-            while (tasks.drainTo(this, n) > 0) {
-                forEach(Runnable::run);
-                clear();
+            try {
+                while (tasks.drainTo(this, n) > 0) {
+                    forEach(Runnable::run);
+                    clear();
+                }
+            } finally {
+                running = false;
             }
-            running = false;
         }};
     }
 

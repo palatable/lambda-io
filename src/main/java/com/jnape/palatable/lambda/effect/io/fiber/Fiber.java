@@ -2,6 +2,8 @@ package com.jnape.palatable.lambda.effect.io.fiber;
 
 import com.jnape.palatable.lambda.adt.Unit;
 
+import java.time.Duration;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -77,6 +79,10 @@ public sealed interface Fiber<A> {
         return new Forever<>(fiber);
     }
 
+    //todo: Duration#toNanos will explode when overflowing, do something better
+    static <A> Fiber<A> delay(Fiber<A> fiber, Duration duration) {
+        return new Delay<>(fiber, duration.toNanos(), TimeUnit.NANOSECONDS);
+    }
 }
 
 record Suspension<A>(Consumer<? super Consumer<? super Result<A>>> k) implements Fiber<A> {
@@ -93,6 +99,9 @@ record Value<A>(Result<A> result) implements Fiber<A> {
 }
 
 record Forever<A>(Fiber<?> fiber) implements Fiber<A> {
+}
+
+record Delay<A>(Fiber<A> fiber, long delay, TimeUnit timeUnit) implements Fiber<A> {
 }
 
 record Bind<Z, A>(Fiber<Z> fiberZ, Function<? super Z, ? extends Fiber<A>> f) implements Fiber<A> {
