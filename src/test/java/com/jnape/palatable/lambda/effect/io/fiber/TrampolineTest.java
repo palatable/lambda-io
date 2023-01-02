@@ -1,7 +1,7 @@
 package com.jnape.palatable.lambda.effect.io.fiber;
 
 import com.jnape.palatable.lambda.functions.Fn1;
-import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -18,13 +18,13 @@ import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.delay;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.failed;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.fiber;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.never;
+import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.pin;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.race;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.result;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.succeeded;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.cancellation;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.failure;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.success;
-import static com.jnape.palatable.lambda.effect.io.fiber.Scheduler.scheduler;
 import static com.jnape.palatable.lambda.effect.io.fiber.Trampoline.trampoline;
 import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.matcher.FiberResultMatcher.yieldsResult;
 import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.matcher.FiberTimeoutMatcher.timesOutAfter;
@@ -32,7 +32,7 @@ import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.scheduler.S
 import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.scheduler.SameThreadTimer.sameThreadTimer;
 import static com.jnape.palatable.lambda.functions.builtin.fn3.Times.times;
 import static com.jnape.palatable.lambda.internal.Runtime.throwChecked;
-import static java.util.concurrent.Executors.newFixedThreadPool;
+import static java.util.Arrays.asList;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.sameInstance;
@@ -228,25 +228,6 @@ public class TrampolineTest {
                            runnable.run();
                        }, canceller, equalTo(cancellation())));
         }
-
-        @Test
-        @Disabled("these are blocking the runtime! revisit with with delayed scheduling")
-        //todo: these are blocking the runtime! revisit with with delayed scheduling
-        public void sanityCheck() {
-            assertThat(race(fiber(() -> {
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException ignored) {
-                }
-                return 1;
-            }), fiber(() -> {
-                try {
-                    Thread.sleep(500);
-                } catch (InterruptedException ignored) {
-                }
-                return 2;
-            })), yieldsResult(scheduler(newFixedThreadPool(2)), equalTo(success(2))));
-        }
     }
 
     @Nested
@@ -321,6 +302,51 @@ public class TrampolineTest {
                     }, canceller, equalTo(cancellation())
             ));
             assertTrue(callbackCalled.get());
+        }
+    }
+
+    @Nested
+    public class Pin {
+        private List<String> interactions;
+
+        private final Scheduler target = runnable -> {
+            interactions.add("on target");
+            runnable.run();
+        };
+        private final Scheduler origin = runnable -> {
+            interactions.add("on origin");
+            runnable.run();
+        };
+
+        @BeforeEach
+        public void setUp() {
+            interactions = new ArrayList<>();
+        }
+
+        @Test
+        public void runsOnSeparateScheduler() {
+            assertThat(pin(fiber((Runnable) () -> interactions.add("fiber")), target),
+                       yieldsResult(origin, equalTo(success())));
+            assertEquals(asList("on origin",
+                                "on target",
+                                "fiber",
+                                "on origin"),
+                         interactions);
+        }
+
+        @Test
+        public void transfersBackToOriginalSchedulerAfterwards() {
+            assertThat(fiber((Runnable) () -> interactions.add("before"))
+                               .bind(__ -> pin(fiber((Runnable) () -> interactions.add("pinned")), target))
+                               .bind(__ -> fiber((Runnable) () -> interactions.add("after"))),
+                       yieldsResult(origin, equalTo(success())));
+            assertEquals(asList("on origin",
+                                "before",
+                                "on target",
+                                "pinned",
+                                "on origin",
+                                "after"),
+                         interactions);
         }
     }
 }

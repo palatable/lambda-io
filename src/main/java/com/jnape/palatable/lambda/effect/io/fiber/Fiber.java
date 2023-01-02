@@ -13,8 +13,6 @@ import static com.jnape.palatable.lambda.effect.io.fiber.Result.cancellation;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.failure;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.success;
 
-//todo: ThreadLocal choice for current trampoline / scheduler ("shift" model)?
-//todo: Fiber#fork(Fiber, Scheduler)
 public sealed interface Fiber<A> {
 
     default <B> Fiber<B> bind(Function<? super A, ? extends Fiber<B>> fn) {
@@ -83,6 +81,10 @@ public sealed interface Fiber<A> {
     static <A> Fiber<A> delay(Fiber<A> fiber, Duration duration) {
         return new Delay<>(fiber, duration.toNanos(), TimeUnit.NANOSECONDS);
     }
+
+    static <A> Fiber<A> pin(Fiber<A> fiber, Scheduler scheduler) {
+        return new Pin<>(fiber, scheduler);
+    }
 }
 
 record Suspension<A>(Consumer<? super Consumer<? super Result<A>>> k) implements Fiber<A> {
@@ -98,6 +100,9 @@ record Value<A>(Result<A> result) implements Fiber<A> {
     }
 }
 
+record Pin<A>(Fiber<A> fiber, Scheduler scheduler) implements Fiber<A> {
+}
+
 record Forever<A>(Fiber<?> fiber) implements Fiber<A> {
 }
 
@@ -111,6 +116,7 @@ record Bind<Z, A>(Fiber<Z> fiberZ, Function<? super Z, ? extends Fiber<A>> f) im
     }
 
     //todo: compare with efficiency of old lambda IO approach of an untyped list storing arrows
+    //todo: should each iterative right association be considered "work" and debit current trampoline budget?
     public Bind<?, A> rightAssociated() {
         Bind<?, A> rightAssociated = this;
         Bind.Eliminator<A, Bind<?, A>> eliminator = new Bind.Eliminator<>() {
