@@ -193,7 +193,7 @@ public class TrampolineTest {
     public class Race {
 
         @Test
-        public void cancellationPreemptsRace() {
+        public void raceRespectsCancellation() {
             Canceller canceller = canceller();
             canceller.cancel();
             assertThat(race(succeeded(1), succeeded(2)),
@@ -217,16 +217,13 @@ public class TrampolineTest {
         }
 
         @Test
-        public void cancellationAfterStartStillCancels() {
+        public void raceUsesChildCanceller() {
             Canceller canceller = canceller();
 
-            AtomicInteger  invocations = new AtomicInteger(0);
-            Fiber<Integer> fiber       = fiber(invocations::incrementAndGet);
-            assertThat(race(fiber, fiber),
-                       yieldsResult(runnable -> {
-                           canceller.cancel();
-                           runnable.run();
-                       }, canceller, equalTo(cancellation())));
+            AtomicBoolean loserExecuted = new AtomicBoolean(false);
+            assertThat(race(succeeded(), succeeded()).bind(Fiber::succeeded),
+                       yieldsResult(canceller, equalTo(success())));
+            assertFalse(loserExecuted.get());
         }
     }
 
