@@ -17,6 +17,7 @@ import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.cancelled;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.delay;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.failed;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.fiber;
+import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.forever;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.never;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.pin;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.race;
@@ -186,6 +187,34 @@ public class TrampolineTest {
                                    .apply(0),
                            yieldsResult(equalTo(success(STACK_EXPLODING_NUMBER))));
             }
+        }
+    }
+
+    @Nested
+    public class Forever {
+
+        @Test
+        public void successRepeatsIndefinitely() {
+            AtomicInteger counter = new AtomicInteger();
+            assertThat(forever(fiber(counter::incrementAndGet).bind(x -> x == 3 ? cancelled() : succeeded(x))),
+                       yieldsResult(cancellation()));
+            assertEquals(3, counter.get());
+        }
+
+        @Test
+        public void failureTerminatesImmediately() {
+            AtomicInteger counter = new AtomicInteger();
+            assertThat(forever(fiber(counter::incrementAndGet).bind(__ -> failed(CAUSE))),
+                       yieldsResult(CAUSE));
+            assertEquals(1, counter.get());
+        }
+
+        @Test
+        public void cancellationTerminatesImmediately() {
+            AtomicInteger counter = new AtomicInteger();
+            assertThat(forever(fiber(counter::incrementAndGet).bind(__ -> cancelled())),
+                       yieldsResult(cancellation()));
+            assertEquals(1, counter.get());
         }
     }
 

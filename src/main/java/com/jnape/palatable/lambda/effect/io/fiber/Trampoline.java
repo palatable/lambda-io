@@ -1,5 +1,8 @@
 package com.jnape.palatable.lambda.effect.io.fiber;
 
+import com.jnape.palatable.lambda.effect.io.fiber.Result.Failure;
+import com.jnape.palatable.lambda.effect.io.fiber.Result.Success;
+
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
@@ -100,12 +103,13 @@ public final class Trampoline implements Runtime {
         tick(fiber, scheduler, canceller, new Continuation<>() {
             @Override
             public void accept(Integer sd, Scheduler sch, Result<Object> res) {
-                if (res instanceof Result.Success<?>)
+                if (res instanceof Success<?>)
                     tick(fiber, sch, canceller, this, sd + 1);
-                else if (res instanceof Result.Failure<?> f)
-                    continuation.accept(sd, sch, f.contort());
                 else
-                    continuation.accept(sd, sch, cancellation());
+                    continuation.accept(sd, sch, res instanceof Failure<?>
+                                                 ? ((Failure<?>) res).contort()
+                                                 : cancellation());
+
             }
         }, stackDepth + 1);
     }
@@ -124,9 +128,9 @@ public final class Trampoline implements Runtime {
     private <X, A> void tick0(Bind<X, A> bind, Scheduler scheduler, Canceller canceller,
                               Continuation<A> continuation, int stackDepth) {
         tick(bind.fiberZ(), scheduler, canceller, (sd, sch, resX) -> {
-            if (resX instanceof Result.Success<X> success) {
+            if (resX instanceof Success<X> success) {
                 tick(bind.f().apply(success.value()), sch, canceller, continuation, sd + 1);
-            } else if (resX instanceof Result.Failure<X> failure) {
+            } else if (resX instanceof Failure<X> failure) {
                 continuation.accept(sd, sch, failure.contort());
             } else {
                 continuation.accept(sd, sch, cancellation());
