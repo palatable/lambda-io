@@ -1,13 +1,16 @@
 package com.jnape.palatable.lambda.effect.io.fiber;
 
+import com.jnape.palatable.lambda.adt.Unit;
 import com.jnape.palatable.lambda.functions.Fn1;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -19,6 +22,7 @@ import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.failed;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.fiber;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.forever;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.never;
+import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.parallel;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.pin;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.race;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.result;
@@ -34,6 +38,8 @@ import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.scheduler.S
 import static com.jnape.palatable.lambda.functions.builtin.fn3.Times.times;
 import static com.jnape.palatable.lambda.internal.Runtime.throwChecked;
 import static java.util.Arrays.asList;
+import static java.util.Collections.singletonList;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.sameInstance;
@@ -44,6 +50,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+@Timeout(value = 100, unit = MILLISECONDS)
 public class TrampolineTest {
 
     private static final RuntimeException CAUSE = new RuntimeException("blew up");
@@ -159,7 +166,7 @@ public class TrampolineTest {
         @Test
         public void cancellationPreemptsSubsequentBinds() {
             AtomicBoolean downstreamCalled = new AtomicBoolean(false);
-            assertThat(Fiber.cancelled().bind(x -> fiber(() -> downstreamCalled.set(true))),
+            assertThat(cancelled().bind(x -> fiber(() -> downstreamCalled.set(true))),
                        yieldsResult(cancellation()));
             assertFalse(downstreamCalled.get());
         }
@@ -222,7 +229,7 @@ public class TrampolineTest {
     public class Race {
 
         @Test
-        public void raceRespectsCancellation() {
+        public void respectsCancellation() {
             Canceller canceller = canceller();
             canceller.cancel();
             assertThat(race(succeeded(1), succeeded(2)),
@@ -231,10 +238,12 @@ public class TrampolineTest {
 
         @Test
         public void firstFinisherWins() {
-            assertThat(race(succeeded(1), never()),
-                       yieldsResult(equalTo(success(1))));
-            assertThat(race(never(), succeeded(2)),
-                       yieldsResult(equalTo(success(2))));
+            for (Result<Unit> result : Arrays.<Result<Unit>>asList(success(), failure(CAUSE), cancellation())) {
+                assertThat(race(result(result), never()),
+                           yieldsResult(equalTo(result)));
+                assertThat(race(never(), result(result)),
+                           yieldsResult(equalTo(result)));
+            }
         }
 
         @Test
@@ -246,7 +255,7 @@ public class TrampolineTest {
         }
 
         @Test
-        public void raceUsesChildCanceller() {
+        public void usesChildCanceller() {
             Canceller canceller = canceller();
 
             AtomicBoolean loserExecuted = new AtomicBoolean(false);

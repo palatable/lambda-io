@@ -5,6 +5,7 @@ import com.jnape.palatable.lambda.effect.io.fiber.Fiber;
 import com.jnape.palatable.lambda.effect.io.fiber.Result;
 import com.jnape.palatable.lambda.effect.io.fiber.Scheduler;
 import com.jnape.palatable.lambda.effect.io.fiber.Timer;
+import com.jnape.palatable.lambda.internal.Runtime;
 import org.hamcrest.Description;
 import org.hamcrest.Matcher;
 import org.hamcrest.TypeSafeMatcher;
@@ -40,10 +41,17 @@ public final class FiberResultMatcher<A> extends TypeSafeMatcher<Fiber<A>> {
     protected synchronized boolean matchesSafely(Fiber<A> fiber) {
         if (result == null)
             result = new CompletableFuture<>() {{
-                trampoline(() -> canceller, scheduler, timer).unsafeRunAsync(fiber, this::complete);
+                trampoline(() -> canceller, scheduler, timer).unsafeRunAsync(fiber, res -> {
+                    if (!complete(res))
+                        throw new AssertionError("Fiber <" + fiber + "> completed again with result <" + res + ">");
+                });
             }};
 
-        return resultMatcher.matches(result.join());
+        try {
+            return resultMatcher.matches(result.get());
+        } catch (Exception e) {
+            throw Runtime.throwChecked(e);
+        }
     }
 
     @Override
