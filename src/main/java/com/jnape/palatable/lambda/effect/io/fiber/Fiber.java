@@ -5,6 +5,7 @@ import com.jnape.palatable.lambda.adt.Unit;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -105,8 +106,8 @@ public sealed interface Fiber<A> {
         return new Delay<>(fiber, duration.toNanos(), TimeUnit.NANOSECONDS);
     }
 
-    static <A> Fiber<A> pin(Fiber<A> fiber, Scheduler scheduler) {
-        return new Pin<>(fiber, scheduler);
+    static <A> Fiber<A> pin(Fiber<A> fiber, Executor executor) {
+        return new Pin<>(fiber, executor);
     }
 }
 
@@ -123,7 +124,7 @@ record Value<A>(Result<A> result) implements Fiber<A> {
     }
 }
 
-record Pin<A>(Fiber<A> fiber, Scheduler scheduler) implements Fiber<A> {
+record Pin<A>(Fiber<A> fiber, Executor executor) implements Fiber<A> {
 }
 
 record Forever<A>(Fiber<?> fiber) implements Fiber<A> {

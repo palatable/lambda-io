@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -358,8 +359,8 @@ public class TrampolineTest {
     public class Pin {
         private List<String> interactions;
 
-        private final Scheduler origin = before(sameThread(), __ -> interactions.add("on origin"));
-        private final Scheduler target = before(sameThread(), __ -> interactions.add("on target"));
+        private final Executor origin = before(sameThread(), __ -> interactions.add("on origin"));
+        private final Executor target = before(sameThread(), __ -> interactions.add("on target"));
 
         @BeforeEach
         public void setUp() {

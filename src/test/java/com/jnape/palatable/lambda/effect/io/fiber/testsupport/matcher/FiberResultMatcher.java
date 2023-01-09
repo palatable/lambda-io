@@ -4,13 +4,13 @@ import com.jnape.palatable.lambda.effect.io.fiber.Canceller;
 import com.jnape.palatable.lambda.effect.io.fiber.Fiber;
 import com.jnape.palatable.lambda.effect.io.fiber.Result;
 import com.jnape.palatable.lambda.effect.io.fiber.Scheduler;
-import com.jnape.palatable.lambda.effect.io.fiber.Timer;
 import com.jnape.palatable.lambda.internal.Runtime;
 import org.hamcrest.Description;
 import org.hamcrest.Matcher;
 import org.hamcrest.TypeSafeMatcher;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 
 import static com.jnape.palatable.lambda.effect.io.fiber.Canceller.canceller;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.failure;
@@ -21,17 +21,17 @@ import static org.hamcrest.Matchers.equalTo;
 
 public final class FiberResultMatcher<A> extends TypeSafeMatcher<Fiber<A>> {
 
-    private final Scheduler                  scheduler;
-    private final Timer                      timer;
-    private final Canceller                  canceller;
+    private final Executor  executor;
+    private final Scheduler scheduler;
+    private final Canceller canceller;
     private final Matcher<? super Result<A>> resultMatcher;
 
     private CompletableFuture<Result<? extends A>> result;
 
-    private FiberResultMatcher(Scheduler scheduler, Timer timer, Canceller canceller,
+    private FiberResultMatcher(Executor executor, Scheduler scheduler, Canceller canceller,
                                Matcher<? super Result<A>> resultMatcher) {
+        this.executor      = executor;
         this.scheduler     = scheduler;
-        this.timer         = timer;
         this.canceller     = canceller;
         this.resultMatcher = resultMatcher;
     }
@@ -40,7 +40,7 @@ public final class FiberResultMatcher<A> extends TypeSafeMatcher<Fiber<A>> {
     protected synchronized boolean matchesSafely(Fiber<A> fiber) {
         if (result == null)
             result = new CompletableFuture<>() {{
-                trampoline(() -> canceller, scheduler, timer).unsafeRunAsync(fiber, res -> {
+                trampoline(() -> canceller, executor, scheduler).unsafeRunAsync(fiber, res -> {
                     if (!complete(res))
                         throw new AssertionError("Fiber <" + fiber + "> completed again with result <" + res + ">");
                 });
@@ -65,24 +65,29 @@ public final class FiberResultMatcher<A> extends TypeSafeMatcher<Fiber<A>> {
         description.appendDescriptionOf(resultMatcher);
     }
 
-    public static <A> FiberResultMatcher<A> yieldsResult(Scheduler scheduler,
-                                                         Timer timer,
+    public static <A> FiberResultMatcher<A> yieldsResult(Executor executor,
+                                                         Scheduler scheduler,
                                                          Canceller canceller,
                                                          Matcher<? super Result<A>> resultMatcher) {
-        return new FiberResultMatcher<>(scheduler, timer, canceller, resultMatcher);
+        return new FiberResultMatcher<>(executor, scheduler, canceller, resultMatcher);
     }
 
 
+    public static <A> FiberResultMatcher<A> yieldsResult(Executor executor,
+                                                         Canceller canceller,
+                                                         Matcher<? super Result<A>> resultMatcher) {
+        return yieldsResult(executor, sameThread(), canceller, resultMatcher);
+    }
+
     public static <A> FiberResultMatcher<A> yieldsResult(Scheduler scheduler,
                                                          Canceller canceller,
                                                          Matcher<? super Result<A>> resultMatcher) {
-        return yieldsResult(scheduler, sameThread(), canceller, resultMatcher);
+        return yieldsResult(sameThread(), scheduler, canceller, resultMatcher);
     }
 
-    public static <A> FiberResultMatcher<A> yieldsResult(Timer timer,
-                                                         Canceller canceller,
+    public static <A> FiberResultMatcher<A> yieldsResult(Executor executor,
                                                          Matcher<? super Result<A>> resultMatcher) {
-        return yieldsResult(sameThread(), timer, canceller, resultMatcher);
+        return yieldsResult(executor, canceller(), resultMatcher);
     }
 
     public static <A> FiberResultMatcher<A> yieldsResult(Scheduler scheduler,
@@ -90,18 +95,13 @@ public final class FiberResultMatcher<A> extends TypeSafeMatcher<Fiber<A>> {
         return yieldsResult(scheduler, canceller(), resultMatcher);
     }
 
-    public static <A> FiberResultMatcher<A> yieldsResult(Timer timer,
-                                                         Matcher<? super Result<A>> resultMatcher) {
-        return yieldsResult(timer, canceller(), resultMatcher);
-    }
-
     public static <A> FiberResultMatcher<A> yieldsResult(Canceller canceller,
                                                          Matcher<? super Result<A>> resultMatcher) {
-        return yieldsResult((Scheduler) sameThread(), canceller, resultMatcher);
+        return yieldsResult((Executor) sameThread(), canceller, resultMatcher);
     }
 
     public static <A> FiberResultMatcher<A> yieldsResult(Matcher<? super Result<A>> resultMatcher) {
-        return yieldsResult((Scheduler) sameThread(), canceller(), resultMatcher);
+        return yieldsResult((Executor) sameThread(), canceller(), resultMatcher);
     }
 
     public static <A> FiberResultMatcher<A> yieldsResult(Result<A> result) {

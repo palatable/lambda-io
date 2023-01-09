@@ -1,20 +1,20 @@
 package com.jnape.palatable.lambda.effect.io.fiber.testsupport.scheduler;
 
 import com.jnape.palatable.lambda.effect.io.fiber.Scheduler;
-import com.jnape.palatable.lambda.effect.io.fiber.Timer;
 
 import java.util.PriorityQueue;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 
 import static java.util.Comparator.comparing;
 
-public final class SameThread implements Timer, Scheduler {
+public final class SameThread implements Scheduler, Executor {
 
-    private static final SameThread INSTANCE = new SameThread(
+    private static final ThreadLocal<SameThread> TL = ThreadLocal.withInitial(() -> new SameThread(
             new PriorityQueue<>(comparing(Task::executionTick).thenComparing(Task::index)),
             false,
             0,
-            0);
+            0));
 
     private final PriorityQueue<Task> tasks;
 
@@ -30,12 +30,12 @@ public final class SameThread implements Timer, Scheduler {
     }
 
     @Override
-    public void schedule(Runnable runnable) {
-        delay(runnable, 0, TimeUnit.SECONDS);
+    public void execute(Runnable runnable) {
+        schedule(runnable, 0, TimeUnit.SECONDS);
     }
 
     @Override
-    public Runnable delay(Runnable runnable, long delay, TimeUnit timeUnit) {
+    public Runnable schedule(Runnable runnable, long delay, TimeUnit timeUnit) {
         if (delay < 0)
             throw new IllegalStateException("delay cannot be negative");
 
@@ -62,7 +62,7 @@ public final class SameThread implements Timer, Scheduler {
     }
 
     public static SameThread sameThread() {
-        return INSTANCE;
+        return TL.get();
     }
 
     private record Task(Runnable runnable, long executionTick, long index) {
