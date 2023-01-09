@@ -8,6 +8,11 @@ import static com.jnape.palatable.lambda.adt.Unit.UNIT;
 public sealed interface Result<A> {
 
     static <A> Success<A> success(A value) {
+        if (value == UNIT) {
+            @SuppressWarnings("unchecked")
+            Success<A> successUnit = (Success<A>) success();
+            return successUnit;
+        }
         return new Success<>(value);
     }
 
@@ -29,7 +34,7 @@ public sealed interface Result<A> {
     }
 
     record Success<A>(A value) implements Result<A> {
-        private static final Success<Unit> SUCCESS_UNIT = success(UNIT);
+        private static final Success<Unit> SUCCESS_UNIT = new Success<>(UNIT);
     }
 
     record Failure<A>(Throwable reason) implements Unsuccessful<A> {

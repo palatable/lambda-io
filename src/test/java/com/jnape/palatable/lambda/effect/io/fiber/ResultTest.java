@@ -3,6 +3,7 @@ package com.jnape.palatable.lambda.effect.io.fiber;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import static com.jnape.palatable.lambda.adt.Unit.UNIT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -15,6 +16,11 @@ public class ResultTest {
         @Test
         public void singletonSuccessUnit() {
             assertSame(Result.success(), Result.success());
+        }
+
+        @Test
+        public void successUnitAvoidsAllocation() {
+            assertSame(Result.success(), Result.success(UNIT));
         }
 
         @Test

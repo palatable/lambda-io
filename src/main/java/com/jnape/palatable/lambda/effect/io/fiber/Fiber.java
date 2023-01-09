@@ -40,6 +40,11 @@ public sealed interface Fiber<A> {
     }
 
     static <A> Fiber<A> result(Result<A> result) {
+        if (result == Result.success()) {
+            @SuppressWarnings("unchecked")
+            Fiber<A> succeededUnit = (Fiber<A>) succeeded();
+            return succeededUnit;
+        }
         return new Value<>(result);
     }
 
@@ -51,10 +56,12 @@ public sealed interface Fiber<A> {
         return Value.SUCCESS_UNIT;
     }
 
+    //todo: Throwable or something more narrow? Generally?
     static <A> Fiber<A> failed(Throwable cause) {
         return result(failure(cause));
     }
 
+    //todo: coproduct?
     static <A> Fiber<A> race(Fiber<A> fiberA, Fiber<A> fiberB) {
         return new Race<>(fiberA, fiberB);
     }
@@ -73,7 +80,6 @@ public sealed interface Fiber<A> {
         return Value.cancelled();
     }
 
-    //todo: is this sensible to expose?
     static <A> Fiber<A> never() {
         return Never.instance();
     }
