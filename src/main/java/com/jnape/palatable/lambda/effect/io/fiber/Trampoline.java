@@ -21,20 +21,20 @@ import static java.util.Arrays.asList;
 public final class Trampoline implements Runtime {
     private static final int maxStackDepth = 512;
 
-    private final Supplier<Canceller> freshCanceller;
+    private final Supplier<Canceller> cancellerFactory;
     private final Executor            defaultExecutor;
     private final Scheduler           scheduler;
 
-    private Trampoline(Supplier<Canceller> freshCanceller, Executor defaultExecutor, Scheduler scheduler) {
-        this.freshCanceller  = freshCanceller;
-        this.defaultExecutor = defaultExecutor;
-        this.scheduler       = scheduler;
+    private Trampoline(Supplier<Canceller> cancellerFactory, Executor defaultExecutor, Scheduler scheduler) {
+        this.cancellerFactory = cancellerFactory;
+        this.defaultExecutor  = defaultExecutor;
+        this.scheduler        = scheduler;
     }
 
     @Override
     public <A> void unsafeRunAsync(Fiber<A> fiber, Consumer<? super Result<A>> callback) {
         //todo: wrap callback.accept in a try/catch?
-        schedule(fiber, defaultExecutor, freshCanceller.get(), (__, ___, res) -> callback.accept(res));
+        schedule(fiber, defaultExecutor, cancellerFactory.get(), (__, ___, res) -> callback.accept(res));
     }
 
     private <A> void tick(Fiber<A> fiber, Executor executor, Canceller canceller, Continuation<A> continuation,
@@ -173,9 +173,9 @@ public final class Trampoline implements Runtime {
         }
     }
 
-    public static Trampoline trampoline(Supplier<Canceller> freshCanceller, Executor defaultExecutor,
+    public static Trampoline trampoline(Supplier<Canceller> cancellerFactory, Executor defaultExecutor,
                                         Scheduler scheduler) {
-        return new Trampoline(freshCanceller, defaultExecutor, scheduler);
+        return new Trampoline(cancellerFactory, defaultExecutor, scheduler);
     }
 
     public static Trampoline trampoline(Executor defaultExecutor, Scheduler scheduler) {
