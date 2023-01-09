@@ -3,6 +3,7 @@ package com.jnape.palatable.lambda.effect.io.fiber;
 import com.jnape.palatable.lambda.adt.Unit;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -61,9 +62,13 @@ public sealed interface Fiber<A> {
         return result(failure(cause));
     }
 
-    //todo: coproduct?
-    static <A> Fiber<A> race(Fiber<A> fiberA, Fiber<A> fiberB) {
-        return new Race<>(fiberA, fiberB);
+    @SafeVarargs
+    static <A> Fiber<A> race(Fiber<A> fiberA, Fiber<A> fiberB, Fiber<A>... rest) {
+        return new Race<>(new ArrayList<>(rest.length + 2) {{
+            add(fiberA);
+            add(fiberB);
+            addAll(asList(rest));
+        }});
     }
 
     @SafeVarargs
@@ -162,7 +167,7 @@ record Bind<Z, A>(Fiber<Z> fiberZ, Function<? super Z, ? extends Fiber<A>> f) im
     }
 }
 
-record Race<A>(Fiber<A> fiberA, Fiber<A> fiberB) implements Fiber<A> {
+record Race<A>(List<Fiber<A>> fibers) implements Fiber<A> {
 }
 
 //todo: figure out a better way to skolemize Parallel<A> <: Fiber<List<A>> than forcing existential elimination via f
@@ -173,6 +178,12 @@ final class Never<A> implements Fiber<A> {
     static final Never<?> INSTANCE = new Never<>();
 
     private Never() {
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <B> Fiber<B> bind(Function<? super A, ? extends Fiber<B>> fn) {
+        return (Fiber<B>) this;
     }
 
     @SuppressWarnings("unchecked")

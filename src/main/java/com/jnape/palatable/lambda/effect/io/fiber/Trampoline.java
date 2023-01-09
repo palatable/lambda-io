@@ -95,8 +95,7 @@ public final class Trampoline implements Runtime {
     private <A> void race(Race<A> race, Scheduler scheduler, Canceller canceller, Continuation<A> continuation) {
         Canceller     child  = canceller.addChild();
         AtomicBoolean winner = new AtomicBoolean(true);
-        //todo: accept more than two fibers to race
-        for (Fiber<A> fiber : List.of(race.fiberA(), race.fiberB())) {
+        for (Fiber<A> fiber : race.fibers()) {
             schedule(fiber, scheduler, child, (stackDepth, sch, res) -> {
                 if (winner.getAndSet(false)) {
                     child.cancel();

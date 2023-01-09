@@ -228,11 +228,16 @@ public class TrampolineTest {
     public class Race {
 
         @Test
-        public void respectsCancellation() {
+        public void cancellationPreemptsRace() {
             Canceller canceller = canceller();
             canceller.cancel();
-            assertThat(race(succeeded(1), succeeded(2)),
+
+            List<String> interactions = new ArrayList<>();
+            assertThat(race(fiber(() -> interactions.add("1")),
+                            fiber(() -> interactions.add("2")),
+                            fiber(() -> interactions.add("3"))),
                        yieldsResult(canceller, equalTo(cancellation())));
+            assertEquals(emptyList(), interactions);
         }
 
         @Test
@@ -246,9 +251,9 @@ public class TrampolineTest {
         }
 
         @Test
-        public void losingFiberIsCancelled() {
+        public void losingFibersAreCancelled() {
             AtomicBoolean loserExecuted = new AtomicBoolean(false);
-            assertThat(race(succeeded(), fiber(() -> loserExecuted.set(true))),
+            assertThat(race(succeeded(), fiber(() -> loserExecuted.set(true)), fiber(() -> loserExecuted.set(true))),
                        yieldsResult(equalTo(success())));
             assertFalse(loserExecuted.get());
         }
@@ -261,6 +266,7 @@ public class TrampolineTest {
             assertThat(race(succeeded(), succeeded()).bind(Fiber::succeeded),
                        yieldsResult(canceller, equalTo(success())));
             assertFalse(loserExecuted.get());
+            assertFalse(canceller.cancelled());
         }
     }
 
@@ -273,7 +279,7 @@ public class TrampolineTest {
         }
 
         @Test
-        public void neverInvokesCallback() {
+        public void hasNoRuntimeInterpretation() {
             assertThrowsExactly(TimeoutException.class, () -> new CompletableFuture<>() {{
                 trampoline(sameThread(), sameThread()).unsafeRunAsync(
                         never(),
@@ -283,10 +289,15 @@ public class TrampolineTest {
         }
 
         @Test
-        public void neverCanBeCancelled() {
+        public void canBeCancelled() {
             Canceller canceller = canceller();
             canceller.cancel();
             assertThat(never(), yieldsResult(canceller, equalTo(cancellation())));
+        }
+
+        @Test
+        public void bindIsNoOp() {
+            assertSame(never(), never().bind(__ -> succeeded(1)));
         }
     }
 
