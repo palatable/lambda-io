@@ -2,14 +2,19 @@ package com.jnape.palatable.lambda.effect.io.fiber;
 
 import com.jnape.palatable.lambda.effect.io.fiber.Result.Failure;
 import com.jnape.palatable.lambda.effect.io.fiber.Result.Success;
+import com.jnape.palatable.lambda.effect.io.fiber.Result.Unsuccessful;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.result;
+import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.succeeded;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.cancellation;
+import static java.util.Arrays.asList;
 
 //todo: configurable maxStackDepth
 public final class Trampoline implements Runtime {
@@ -27,6 +32,7 @@ public final class Trampoline implements Runtime {
 
     @Override
     public <A> void unsafeRunAsync(Fiber<A> fiber, Consumer<? super Result<A>> callback) {
+        //todo: wrap callback.accept in a try/catch?
         schedule(fiber, defaultScheduler, freshCanceller.get(), (__, ___, res) -> callback.accept(res));
     }
 
@@ -54,15 +60,17 @@ public final class Trampoline implements Runtime {
                 suspension.k().accept((Consumer<Result<A>>) res -> continuation.accept(stackDepth, scheduler, res));
             } else if (fiber instanceof Forever<A> forever) {
                 forever(forever, scheduler, canceller, continuation, stackDepth);
-            } else if (fiber instanceof Race<A> race) {
-                race(race, scheduler, canceller, continuation);
             } else if (fiber instanceof Bind<?, A> bind) {
                 bind(bind, scheduler, canceller, continuation, stackDepth);
-            } else if (fiber instanceof Delay<A> delay) {
-                delay(delay, scheduler, canceller, continuation);
             } else if (fiber instanceof Pin<A> pin) {
                 pin(pin, scheduler, canceller, continuation, stackDepth);
-            } // else Never
+            } else if (fiber instanceof Delay<A> delay) {
+                delay(delay, scheduler, canceller, continuation);
+            } else if (fiber instanceof Race<A> race) {
+                race(race, scheduler, canceller, continuation);
+            } else if (fiber instanceof Parallel<?, A> parallel) {
+                parallel(parallel, scheduler, canceller, continuation);
+            }
         }
     }
 
@@ -77,6 +85,7 @@ public final class Trampoline implements Runtime {
     }
 
     private <A> void delay(Delay<A> delay, Scheduler scheduler, Canceller canceller, Continuation<A> continuation) {
+        //todo: if delay is 0, just keep ticking
         Runnable cancel = timer.delay(() -> schedule(delay.fiber(), scheduler, canceller, continuation),
                                       delay.delay(), delay.timeUnit());
         if (!canceller.onCancellation(cancel))
@@ -91,7 +100,7 @@ public final class Trampoline implements Runtime {
             schedule(fiber, scheduler, child, (stackDepth, sch, res) -> {
                 if (winner.getAndSet(false)) {
                     child.cancel();
-                    continuation.accept(stackDepth + 1, sch, res);
+                    tick(result(res), sch, canceller, continuation, stackDepth + 1);
                 }
             });
         }
@@ -107,10 +116,7 @@ public final class Trampoline implements Runtime {
                 if (res instanceof Success<?>)
                     tick(fiber, sch, canceller, this, sd + 1);
                 else
-                    continuation.accept(sd, sch, res instanceof Failure<?>
-                                                 ? ((Failure<?>) res).contort()
-                                                 : cancellation());
-
+                    tick(result(((Unsuccessful<?>) res).contort()), sch, canceller, continuation, sd + 1);
             }
         }, stackDepth + 1);
     }
@@ -128,15 +134,43 @@ public final class Trampoline implements Runtime {
 
     private <X, A> void tick0(Bind<X, A> bind, Scheduler scheduler, Canceller canceller,
                               Continuation<A> continuation, int stackDepth) {
-        tick(bind.fiberZ(), scheduler, canceller, (sd, sch, resX) -> {
-            if (resX instanceof Success<X> success) {
-                tick(bind.f().apply(success.value()), sch, canceller, continuation, sd + 1);
-            } else if (resX instanceof Failure<X> failure) {
-                continuation.accept(sd, sch, failure.contort());
-            } else {
-                continuation.accept(sd, sch, cancellation());
-            }
-        }, stackDepth + 1);
+        tick(bind.fiberZ(), scheduler, canceller, (sd, sch, resX) ->
+                     tick(resX instanceof Success<X> success
+                          //todo: wrap apply() in a try/catch?
+                          ? bind.f().apply(success.value())
+                          : result(((Unsuccessful<X>) resX).contort()),
+                          sch, canceller, continuation, sd + 1),
+             stackDepth + 1);
+    }
+
+    private <X, A> void parallel(Parallel<X, A> parallel, Scheduler scheduler, Canceller canceller,
+                                 Continuation<A> continuation) {
+        List<Fiber<X>>                         fibers    = parallel.fibers();
+        Function<? super List<X>, ? extends A> f         = parallel.f();
+        int                                    n         = fibers.size();
+        Object[]                               results   = new Object[n];
+        AtomicInteger                          remaining = new AtomicInteger(n);
+
+        Canceller child = canceller.addChild();
+        for (int i = 0; i < n; i++) {
+            final int finalI = i;
+            schedule(fibers.get(finalI), scheduler, child, (sd, sch, result) -> {
+                if (result instanceof Success<X> success) {
+                    results[finalI] = success.value();
+                    if (remaining.decrementAndGet() == 0) {
+                        //todo: replace List with something with an immutable interface
+                        @SuppressWarnings("unchecked") List<X> list = (List<X>) asList(results);
+                        tick(succeeded(f.apply(list)), sch, canceller, continuation, sd + 1);
+                    }
+                } else if (remaining.getAndSet(-1) > 0) {
+                    child.cancel();
+                    tick(result(result instanceof Failure<X> failure
+                                ? failure.contort()
+                                : cancellation()),
+                         sch, canceller, continuation, sd + 1);
+                }
+            });
+        }
     }
 
     public static Trampoline trampoline(Supplier<Canceller> freshCanceller, Scheduler defaultScheduler, Timer timer) {

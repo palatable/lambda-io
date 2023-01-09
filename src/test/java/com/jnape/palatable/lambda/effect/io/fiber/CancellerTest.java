@@ -26,8 +26,8 @@ public class CancellerTest {
 
     @AfterEach
     public void tearDown() {
-        canceller.cancel();
-        canceller = null;
+//        canceller.cancel();
+//        canceller = null;
     }
 
     @Test

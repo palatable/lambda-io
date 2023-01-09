@@ -3,6 +3,7 @@ package com.jnape.palatable.lambda.effect.io.fiber;
 import com.jnape.palatable.lambda.adt.Unit;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -12,6 +13,8 @@ import static com.jnape.palatable.lambda.adt.Unit.UNIT;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.cancellation;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.failure;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.success;
+import static java.util.Arrays.asList;
+import static java.util.function.Function.identity;
 
 public sealed interface Fiber<A> {
 
@@ -54,6 +57,15 @@ public sealed interface Fiber<A> {
 
     static <A> Fiber<A> race(Fiber<A> fiberA, Fiber<A> fiberB) {
         return new Race<>(fiberA, fiberB);
+    }
+
+    @SafeVarargs
+    static <A> Fiber<List<A>> parallel(Fiber<A>... fibers) {
+        return parallel(asList(fibers));
+    }
+
+    static <A> Fiber<List<A>> parallel(List<Fiber<A>> fibers) {
+        return new Parallel<>(fibers, identity());
     }
 
     //todo: is this sensible to expose?
@@ -145,6 +157,10 @@ record Bind<Z, A>(Fiber<Z> fiberZ, Function<? super Z, ? extends Fiber<A>> f) im
 }
 
 record Race<A>(Fiber<A> fiberA, Fiber<A> fiberB) implements Fiber<A> {
+}
+
+//todo: figure out a better way to skolemize Parallel<A> <: Fiber<List<A>> than forcing existential elimination via f
+record Parallel<Z, A>(List<Fiber<Z>> fibers, Function<? super List<Z>, ? extends A> f) implements Fiber<A> {
 }
 
 final class Never<A> implements Fiber<A> {

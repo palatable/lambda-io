@@ -24,11 +24,15 @@ public sealed interface Result<A> {
         return (Cancellation<A>) Cancellation.INSTANCE;
     }
 
+    sealed interface Unsuccessful<A> extends Result<A> {
+        <B> Unsuccessful<B> contort();
+    }
+
     record Success<A>(A value) implements Result<A> {
         private static final Success<Unit> SUCCESS_UNIT = success(UNIT);
     }
 
-    record Failure<A>(Throwable reason) implements Result<A> {
+    record Failure<A>(Throwable reason) implements Unsuccessful<A> {
 
         @SuppressWarnings("unchecked")
         public <B> Failure<B> contort() {
@@ -36,10 +40,15 @@ public sealed interface Result<A> {
         }
     }
 
-    final class Cancellation<A> implements Result<A> {
+    final class Cancellation<A> implements Unsuccessful<A> {
         private static final Cancellation<?> INSTANCE = new Cancellation<>();
 
         private Cancellation() {
+        }
+
+        @SuppressWarnings("unchecked")
+        public <B> Cancellation<B> contort() {
+            return (Cancellation<B>) this;
         }
 
         @Override

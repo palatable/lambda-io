@@ -26,11 +26,13 @@ public final class Canceller {
     public void cancel() {
         CancelState cancelState = stateRef.getAndSet(CancelState.cancelled());
         if (!cancelState.isCancelled()) {
-            //todo: this will slow down cancel propagation -- consider relocating to shared FiberState or some such
-            cancelState.callbacks().forEach(c -> {try {c.run();} catch (Exception ignored) {}});
-            cancelState.children().forEach(Canceller::cancel);
             if (parent != null)
                 parent.removeChild(this);
+
+            //todo: this will slow down cancel propagation -- consider relocating to shared FiberState or some such
+            cancelState.callbacks().forEach(c -> {try {c.run();} catch (Exception ignored) {}});
+            //todo: not stack safe, although it would have to be pretty deep...
+            cancelState.children().forEach(Canceller::cancel);
         }
     }
 

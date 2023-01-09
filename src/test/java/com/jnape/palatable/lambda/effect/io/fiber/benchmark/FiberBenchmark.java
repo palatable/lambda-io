@@ -14,8 +14,7 @@ import static com.jnape.palatable.lambda.effect.io.fiber.Scheduler.scheduler;
 import static com.jnape.palatable.lambda.effect.io.fiber.Timer.timer;
 import static com.jnape.palatable.lambda.effect.io.fiber.Trampoline.trampoline;
 import static com.jnape.palatable.lambda.effect.io.fiber.benchmark.Sample.sample;
-import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.scheduler.SameThreadScheduler.sameThreadScheduler;
-import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.scheduler.SameThreadTimer.sameThreadTimer;
+import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.scheduler.SameThread.sameThread;
 import static com.jnape.palatable.lambda.functions.builtin.fn3.Times.times;
 import static java.lang.String.format;
 import static java.lang.Thread.currentThread;
@@ -49,7 +48,7 @@ public class FiberBenchmark {
         [main] Sample <Conditional (SameThread)>: 300000000 (138.391571/us average, 2167762us elapsed)
          */
         public static void main(String[] args) {
-            doSample(SameThread.class, sameThreadScheduler(), sameThreadTimer());
+            doSample(SameThread.class, sameThread(), sameThread());
         }
     }
 
@@ -141,7 +140,7 @@ public class FiberBenchmark {
                 Fiber<Unit> fiber   = fiber(sample::mark);
                 Fiber<Unit> forever = times(100_000, f -> f.bind(__ -> f), fiber);
 
-                trampoline(sameThreadScheduler(), sameThreadTimer()).unsafeRunAsync(forever, System.out::println);
+                trampoline(sameThread(), sameThread()).unsafeRunAsync(forever, System.out::println);
             }
         }
 
@@ -156,7 +155,7 @@ public class FiberBenchmark {
                 Fiber<Unit> fiber   = fiber(sample::mark);
                 Fiber<Unit> forever = foreverBind(times(100_000, f -> f.bind(__ -> f), fiber));
 
-                trampoline(sameThreadScheduler(), sameThreadTimer()).unsafeRunAsync(forever, System.out::println);
+                trampoline(sameThread(), sameThread()).unsafeRunAsync(forever, System.out::println);
                 Thread.currentThread().join();
             }
         }

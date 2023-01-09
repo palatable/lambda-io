@@ -16,8 +16,7 @@ import static com.jnape.palatable.lambda.effect.io.fiber.Canceller.canceller;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.failure;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.success;
 import static com.jnape.palatable.lambda.effect.io.fiber.Trampoline.trampoline;
-import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.scheduler.SameThreadScheduler.sameThreadScheduler;
-import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.scheduler.SameThreadTimer.sameThreadTimer;
+import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.scheduler.SameThread.sameThread;
 import static org.hamcrest.Matchers.equalTo;
 
 public final class FiberResultMatcher<A> extends TypeSafeMatcher<Fiber<A>> {
@@ -77,13 +76,13 @@ public final class FiberResultMatcher<A> extends TypeSafeMatcher<Fiber<A>> {
     public static <A> FiberResultMatcher<A> yieldsResult(Scheduler scheduler,
                                                          Canceller canceller,
                                                          Matcher<? super Result<A>> resultMatcher) {
-        return yieldsResult(scheduler, sameThreadTimer(), canceller, resultMatcher);
+        return yieldsResult(scheduler, sameThread(), canceller, resultMatcher);
     }
 
     public static <A> FiberResultMatcher<A> yieldsResult(Timer timer,
                                                          Canceller canceller,
                                                          Matcher<? super Result<A>> resultMatcher) {
-        return yieldsResult(sameThreadScheduler(), timer, canceller, resultMatcher);
+        return yieldsResult(sameThread(), timer, canceller, resultMatcher);
     }
 
     public static <A> FiberResultMatcher<A> yieldsResult(Scheduler scheduler,
@@ -98,11 +97,11 @@ public final class FiberResultMatcher<A> extends TypeSafeMatcher<Fiber<A>> {
 
     public static <A> FiberResultMatcher<A> yieldsResult(Canceller canceller,
                                                          Matcher<? super Result<A>> resultMatcher) {
-        return yieldsResult(sameThreadScheduler(), canceller, resultMatcher);
+        return yieldsResult((Scheduler) sameThread(), canceller, resultMatcher);
     }
 
     public static <A> FiberResultMatcher<A> yieldsResult(Matcher<? super Result<A>> resultMatcher) {
-        return yieldsResult(sameThreadScheduler(), canceller(), resultMatcher);
+        return yieldsResult((Scheduler) sameThread(), canceller(), resultMatcher);
     }
 
     public static <A> FiberResultMatcher<A> yieldsResult(Result<A> result) {
