@@ -90,6 +90,7 @@ public sealed interface Fiber<A> {
         return Never.instance();
     }
 
+    //todo: microbenchmark performance of Supplier vs. callback delegate
     static Fiber<Unit> fiber(Runnable action) {
         return fiber(() -> {
             action.run();
