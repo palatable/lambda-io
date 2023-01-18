@@ -1,6 +1,7 @@
 package com.jnape.palatable.lambda.effect.io.fiber.testsupport.matcher;
 
 import com.jnape.palatable.lambda.effect.io.fiber.Canceller;
+import com.jnape.palatable.lambda.effect.io.fiber.Environment;
 import com.jnape.palatable.lambda.effect.io.fiber.Fiber;
 import com.jnape.palatable.lambda.effect.io.fiber.Result;
 import com.jnape.palatable.lambda.effect.io.fiber.Scheduler;
@@ -13,17 +14,18 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
 import static com.jnape.palatable.lambda.effect.io.fiber.Canceller.canceller;
+import static com.jnape.palatable.lambda.effect.io.fiber.Configuration.DEFAULT;
+import static com.jnape.palatable.lambda.effect.io.fiber.FiberRunLoop.fiberRunLoop;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.failure;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.success;
-import static com.jnape.palatable.lambda.effect.io.fiber.Trampoline.trampoline;
 import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.scheduler.SameThread.sameThread;
 import static org.hamcrest.Matchers.equalTo;
 
 public final class FiberResultMatcher<A> extends TypeSafeMatcher<Fiber<A>> {
 
-    private final Executor  executor;
-    private final Scheduler scheduler;
-    private final Canceller canceller;
+    private final Executor                   executor;
+    private final Scheduler                  scheduler;
+    private final Canceller                  canceller;
     private final Matcher<? super Result<A>> resultMatcher;
 
     private CompletableFuture<Result<? extends A>> result;
@@ -40,10 +42,11 @@ public final class FiberResultMatcher<A> extends TypeSafeMatcher<Fiber<A>> {
     protected synchronized boolean matchesSafely(Fiber<A> fiber) {
         if (result == null)
             result = new CompletableFuture<>() {{
-                trampoline(() -> canceller, executor, scheduler).unsafeRunAsync(fiber, res -> {
-                    if (!complete(res))
-                        throw new AssertionError("Fiber <" + fiber + "> completed again with result <" + res + ">");
-                });
+                fiberRunLoop(new Environment(scheduler, executor, executor, () -> canceller, DEFAULT))
+                        .unsafeRunAsync(fiber, res -> {
+                            if (!complete(res))
+                                throw new AssertionError("Fiber <" + fiber + "> completed again with result <" + res + ">");
+                        });
             }};
 
         try {

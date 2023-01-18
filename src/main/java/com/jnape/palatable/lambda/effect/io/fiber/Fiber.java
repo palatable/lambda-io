@@ -28,7 +28,6 @@ public sealed interface Fiber<A> {
         return new Suspension<>(k);
     }
 
-    //todo: env variable to determine whether this is treated as blocking or non-blocking by default for upgrade path?
     static <A> Fiber<A> fiber(Supplier<? extends A> task) {
         return fiber(k -> {
             Result<A> result;

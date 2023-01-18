@@ -17,6 +17,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.jnape.palatable.lambda.effect.io.fiber.Canceller.canceller;
+import static com.jnape.palatable.lambda.effect.io.fiber.Configuration.DEFAULT;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.cancelled;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.delay;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.failed;
@@ -28,10 +29,10 @@ import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.pin;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.race;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.result;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.succeeded;
+import static com.jnape.palatable.lambda.effect.io.fiber.FiberRunLoop.fiberRunLoop;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.cancellation;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.failure;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.success;
-import static com.jnape.palatable.lambda.effect.io.fiber.Trampoline.trampoline;
 import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.matcher.FiberResultMatcher.yieldsResult;
 import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.scheduler.DecoratingScheduler.before;
 import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.scheduler.SameThread.sameThread;
@@ -54,7 +55,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 @Timeout(value = 100, unit = MILLISECONDS)
-public class TrampolineTest {
+public class FiberRunLoopTest {
+
+    private static final Environment TEST_ENVIRONMENT =
+            new Environment(sameThread(), sameThread(), sameThread(), Canceller::canceller, DEFAULT);
 
     private static final RuntimeException CAUSE = new RuntimeException("blew up");
 
@@ -121,10 +125,11 @@ public class TrampolineTest {
         public void doesNotCatchThrowableFromCallback() {
             AtomicInteger invocationCounter = new AtomicInteger(0);
             try {
-                trampoline(sameThread(), sameThread()).unsafeRunAsync(fiber(() -> 1), res -> {
-                    invocationCounter.incrementAndGet();
-                    throw throwChecked(CAUSE);
-                });
+                fiberRunLoop(TEST_ENVIRONMENT)
+                        .unsafeRunAsync(fiber(() -> 1), res -> {
+                            invocationCounter.incrementAndGet();
+                            throw throwChecked(CAUSE);
+                        });
                 fail("Expected callback to throw, but didn't.");
             } catch (Throwable thrown) {
                 assertSame(CAUSE, thrown, "Expected to throw throwable, but threw <" + thrown + ">");
@@ -282,7 +287,7 @@ public class TrampolineTest {
         @Test
         public void hasNoRuntimeInterpretation() {
             assertThrowsExactly(TimeoutException.class, () -> new CompletableFuture<>() {{
-                trampoline(sameThread(), sameThread()).unsafeRunAsync(
+                fiberRunLoop(TEST_ENVIRONMENT).unsafeRunAsync(
                         never(),
                         this::complete
                 );

@@ -17,18 +17,19 @@ import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.succeeded;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.cancellation;
 import static java.util.Arrays.asList;
 
-//todo: configurable maxStackDepth
-public final class Trampoline implements Runtime {
-    private static final int maxStackDepth = 512;
+public final class FiberRunLoop implements Runtime {
 
     private final Supplier<Canceller> cancellerFactory;
     private final Executor            defaultExecutor;
     private final Scheduler           scheduler;
+    private final int                 maxTicksBeforePreemption;
 
-    private Trampoline(Supplier<Canceller> cancellerFactory, Executor defaultExecutor, Scheduler scheduler) {
-        this.cancellerFactory = cancellerFactory;
-        this.defaultExecutor  = defaultExecutor;
-        this.scheduler        = scheduler;
+    private FiberRunLoop(Supplier<Canceller> cancellerFactory, Executor defaultExecutor, Scheduler scheduler,
+                         int maxTicksBeforePreemption) {
+        this.cancellerFactory         = cancellerFactory;
+        this.defaultExecutor          = defaultExecutor;
+        this.scheduler                = scheduler;
+        this.maxTicksBeforePreemption = maxTicksBeforePreemption;
     }
 
     @Override
@@ -43,7 +44,7 @@ public final class Trampoline implements Runtime {
         if (canceller.cancelled()) {
             continuation.accept(stackDepth, executor, cancellation());
         } else {
-            if (stackDepth == maxStackDepth) {
+            if (stackDepth == maxTicksBeforePreemption) {
                 schedule(fiber, executor, canceller, continuation);
                 return;
             }
@@ -56,7 +57,9 @@ public final class Trampoline implements Runtime {
             //      - something else?
             if (fiber instanceof Value<A> value) {
                 continuation.accept(stackDepth, executor, value.result());
-            } else if (fiber instanceof Suspension<A> suspension) {
+            }
+            //todo: env variable to determine whether this is treated as blocking or non-blocking by default for upgrade path?
+            else if (fiber instanceof Suspension<A> suspension) {
                 //todo: should this be wrapped in try/catch and re-throw as critical error?
                 suspension.k().accept((Consumer<Result<A>>) res -> continuation.accept(stackDepth, executor, res));
             } else if (fiber instanceof Forever<A> forever) {
@@ -173,13 +176,9 @@ public final class Trampoline implements Runtime {
         }
     }
 
-    public static Trampoline trampoline(Supplier<Canceller> cancellerFactory, Executor defaultExecutor,
-                                        Scheduler scheduler) {
-        return new Trampoline(cancellerFactory, defaultExecutor, scheduler);
-    }
-
-    public static Trampoline trampoline(Executor defaultExecutor, Scheduler scheduler) {
-        return trampoline(Canceller::canceller, defaultExecutor, scheduler);
+    public static FiberRunLoop fiberRunLoop(Environment environment) {
+        return new FiberRunLoop(environment.cancellerFactory(), environment.defaultExecutor(),
+                                environment.scheduler(), environment.configuration().maxTicksBeforePreemption());
     }
 
     interface Continuation<A> {
