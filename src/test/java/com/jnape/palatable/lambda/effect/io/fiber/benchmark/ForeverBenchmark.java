@@ -22,11 +22,11 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 
-import static com.jnape.palatable.lambda.effect.io.fiber.Configuration.DEFAULT;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.forever;
 import static com.jnape.palatable.lambda.effect.io.fiber.FiberRunLoop.fiberRunLoop;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.cancellation;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.success;
+import static com.jnape.palatable.lambda.effect.io.fiber.RuntimeSettings.DEFAULT;
 import static com.jnape.palatable.lambda.effect.io.fiber.Scheduler.scheduler;
 import static com.jnape.palatable.lambda.effect.io.fiber.benchmark.Benchmark.OPS_PER_BENCHMARK;
 import static com.jnape.palatable.lambda.effect.io.fiber.benchmark.Benchmark.runBenchmarks;
@@ -67,7 +67,7 @@ public class ForeverBenchmark {
             Scheduler scheduler = scheduler(scheduledExecutorService);
             executorService.execute(() -> {});
             scheduler.schedule(() -> {}, 1, MILLISECONDS);
-            runtime = fiberRunLoop(new Environment(scheduler, executorService, executorService, Canceller::canceller, DEFAULT));
+            runtime = fiberRunLoop(new Environment(scheduler, executorService, executorService, Canceller::canceller), DEFAULT);
         }
 
         @TearDown(Invocation)

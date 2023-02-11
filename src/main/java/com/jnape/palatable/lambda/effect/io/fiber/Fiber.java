@@ -57,7 +57,6 @@ public sealed interface Fiber<A> {
         return Value.SUCCESS_UNIT;
     }
 
-    //todo: Throwable or something more narrow? Generally?
     static <A> Fiber<A> failed(Throwable cause) {
         return result(failure(cause));
     }
@@ -85,11 +84,6 @@ public sealed interface Fiber<A> {
         return Value.cancelled();
     }
 
-    static <A> Fiber<A> never() {
-        return Never.instance();
-    }
-
-    //todo: microbenchmark performance of Supplier vs. callback delegate
     static Fiber<Unit> fiber(Runnable action) {
         return fiber(() -> {
             action.run();
@@ -140,7 +134,6 @@ record Bind<Z, A>(Fiber<Z> fiberZ, Function<? super Z, ? extends Fiber<A>> f) im
     }
 
     //todo: compare with efficiency of old lambda IO approach of an untyped list storing arrows
-    //todo: should each iterative right association be considered "work" and debit current trampoline budget?
     public Bind<?, A> rightAssociated() {
         Bind<?, A> rightAssociated = this;
         Bind.Eliminator<A, Bind<?, A>> eliminator = new Bind.Eliminator<>() {
@@ -155,7 +148,6 @@ record Bind<Z, A>(Fiber<Z> fiberZ, Function<? super Z, ? extends Fiber<A>> f) im
             }
         };
 
-        //todo: scan two nested binds ahead before re-association for specialized #forever() case?
         while (rightAssociated.fiberZ() instanceof Bind<?, ?>) {
             rightAssociated = rightAssociated.eliminate(eliminator);
         }
@@ -171,24 +163,5 @@ record Bind<Z, A>(Fiber<Z> fiberZ, Function<? super Z, ? extends Fiber<A>> f) im
 record Race<A>(List<Fiber<A>> fibers) implements Fiber<A> {
 }
 
-//todo: figure out a better way to skolemize Parallel<A> <: Fiber<List<A>> than forcing existential elimination via f
 record Parallel<Z, A>(List<Fiber<Z>> fibers, Function<? super List<Z>, ? extends A> f) implements Fiber<A> {
-}
-
-final class Never<A> implements Fiber<A> {
-    static final Never<?> INSTANCE = new Never<>();
-
-    private Never() {
-    }
-
-    @Override
-    @SuppressWarnings("unchecked")
-    public <B> Fiber<B> bind(Function<? super A, ? extends Fiber<B>> fn) {
-        return (Fiber<B>) this;
-    }
-
-    @SuppressWarnings("unchecked")
-    static <A> Never<A> instance() {
-        return (Never<A>) INSTANCE;
-    }
 }

@@ -176,9 +176,9 @@ public final class FiberRunLoop implements Runtime {
         }
     }
 
-    public static FiberRunLoop fiberRunLoop(Environment environment) {
+    public static FiberRunLoop fiberRunLoop(Environment environment, RuntimeSettings runtimeSettings) {
         return new FiberRunLoop(environment.cancellerFactory(), environment.defaultExecutor(),
-                                environment.scheduler(), environment.configuration().maxTicksBeforePreemption());
+                                environment.scheduler(), runtimeSettings.maxTicksBeforePreemption());
     }
 
     interface Continuation<A> {

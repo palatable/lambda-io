@@ -14,10 +14,10 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
 import static com.jnape.palatable.lambda.effect.io.fiber.Canceller.canceller;
-import static com.jnape.palatable.lambda.effect.io.fiber.Configuration.DEFAULT;
 import static com.jnape.palatable.lambda.effect.io.fiber.FiberRunLoop.fiberRunLoop;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.failure;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.success;
+import static com.jnape.palatable.lambda.effect.io.fiber.RuntimeSettings.DEFAULT;
 import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.scheduler.SameThread.sameThread;
 import static org.hamcrest.Matchers.equalTo;
 
@@ -42,7 +42,7 @@ public final class FiberResultMatcher<A> extends TypeSafeMatcher<Fiber<A>> {
     protected synchronized boolean matchesSafely(Fiber<A> fiber) {
         if (result == null)
             result = new CompletableFuture<>() {{
-                fiberRunLoop(new Environment(scheduler, executor, executor, () -> canceller, DEFAULT))
+                fiberRunLoop(new Environment(scheduler, executor, executor, () -> canceller), DEFAULT)
                         .unsafeRunAsync(fiber, res -> {
                             if (!complete(res))
                                 throw new AssertionError("Fiber <" + fiber + "> completed again with result <" + res + ">");

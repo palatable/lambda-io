@@ -12,18 +12,18 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 import static java.lang.Runtime.getRuntime;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.concurrent.ForkJoinPool.defaultForkJoinWorkerThreadFactory;
 
 public record Environment(Scheduler scheduler,
                           Executor defaultExecutor,
                           Executor blockingExecutor,
-                          Supplier<Canceller> cancellerFactory,
-                          Configuration configuration) {
+                          Supplier<Canceller> cancellerFactory) {
 
-    public static Environment fromConfiguration(Configuration configuration) {
+    public static Environment fromSettings(EnvironmentSettings environmentSettings) {
+        boolean interruptFuturesOnCancel = environmentSettings.interruptFuturesOnCancel();
         Scheduler scheduler = new Scheduler() {
-            private final boolean mayInterruptIfRunning = configuration.mayInterruptFuturesOnCancel();
-            private final ScheduledExecutorService ses = Executors.newSingleThreadScheduledExecutor(r -> new Thread(r) {{
+            private final ScheduledExecutorService ses = newSingleThreadScheduledExecutor(r -> new Thread(r) {{
                 setDaemon(true);
                 setPriority(MAX_PRIORITY);
             }});
@@ -31,12 +31,13 @@ public record Environment(Scheduler scheduler,
             @Override
             public Runnable schedule(Runnable runnable, long delay, TimeUnit timeUnit) {
                 ScheduledFuture<?> future = ses.schedule(runnable, delay, timeUnit);
-                return () -> future.cancel(mayInterruptIfRunning);
+                return () -> future.cancel(interruptFuturesOnCancel);
             }
         };
 
-        AtomicInteger threadCounter  = new AtomicInteger(1);
-        int           virtualThreads = getRuntime().availableProcessors();
+        AtomicInteger threadCounter = new AtomicInteger(1);
+        //todo: make configurable, e.g. AvailableProcessors, One, Custom(int)
+        int virtualThreads = getRuntime().availableProcessors();
         ExecutorService defaultExecutor = new ForkJoinPool(
                 virtualThreads,
                 pool -> {
@@ -46,10 +47,10 @@ public record Environment(Scheduler scheduler,
                 },
                 null, true);
         ExecutorService blockingExecutor = Executors.newCachedThreadPool();
-        return new Environment(scheduler, defaultExecutor, blockingExecutor, Canceller::canceller, configuration);
+        return new Environment(scheduler, defaultExecutor, blockingExecutor, Canceller::canceller);
     }
 
-    public static Environment process() {
-        return fromConfiguration(Configuration.process());
+    public static Environment implicit() {
+        return fromSettings(EnvironmentSettings.system());
     }
 }

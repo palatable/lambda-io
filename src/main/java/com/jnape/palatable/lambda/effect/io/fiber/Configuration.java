@@ -1,16 +1,25 @@
 package com.jnape.palatable.lambda.effect.io.fiber;
 
-import java.util.Optional;
-import java.util.Set;
-import java.util.function.Function;
+import com.jnape.palatable.lambda.adt.Maybe;
+import com.jnape.palatable.lambda.functions.Fn1;
+import com.jnape.palatable.lambda.functions.specialized.Kleisli;
+import com.jnape.palatable.shoki.impl.HashMap;
+
+import static com.jnape.palatable.lambda.adt.Maybe.maybe;
+import static com.jnape.palatable.lambda.adt.Try.trying;
+import static com.jnape.palatable.lambda.adt.hlist.HList.tuple;
+import static com.jnape.palatable.lambda.monoid.builtin.First.first;
+import static com.jnape.palatable.shoki.impl.HashMap.hashMap;
+import static java.lang.Integer.parseInt;
+import static java.lang.System.getProperty;
+import static java.lang.System.getenv;
 
 //todo: Configuration interface? Either info for auto-building executors, or explicit executors?
-public record Configuration(boolean mayInterruptFuturesOnCancel,
-                            boolean treatThunksAsBlocking,
+public record Configuration(boolean treatThunksAsBlocking,
                             int maxTicksBeforePreemption) {
 
-    public static final Configuration DEFAULT                    = new Configuration(false, false, 512);
-    public static final Configuration UPGRADE_PATH_FROM_LAMBDA_5 = new Configuration(true, true, 512);
+    public static final Configuration DEFAULT                    = new Configuration(false, 512);
+    public static final Configuration UPGRADE_PATH_FROM_LAMBDA_5 = new Configuration(true,  512);
 
     private static volatile Configuration PROCESS;
 
@@ -27,35 +36,21 @@ public record Configuration(boolean mayInterruptFuturesOnCancel,
     }
 
     private static Configuration load() {
-        Function<String, Optional<String>> readProperty = s -> Optional.ofNullable(System.getProperty(s));
-        Function<String, Optional<String>> readEnv      = s -> Optional.ofNullable(System.getenv(s));
+        HashMap<String, Boolean>                           bools        = hashMap(tuple("true", true), tuple("false", false));
+        Kleisli<String, String, Maybe<?>, Maybe<String>>   readProperty = s -> maybe(getProperty(s));
+        Kleisli<String, String, Maybe<?>, Maybe<String>>   readEnv      = s -> maybe(getenv(s));
+        Kleisli<String, Boolean, Maybe<?>, Maybe<Boolean>> parseBool    = s -> bools.get(s.toLowerCase());
+        Kleisli<String, Integer, Maybe<?>, Maybe<Integer>> parseInt     = s -> trying(() -> parseInt(s)).toMaybe();
 
-        Function<String, Optional<Boolean>> parseBool = s -> Optional.of(s.toLowerCase())
-                .filter(Set.of("true", "false")::contains)
-                .map(Boolean::parseBoolean);
+        Fn1<String, Maybe<Boolean>> readBoolProperty = readProperty.andThen(parseBool);
+        Fn1<String, Maybe<Boolean>> readBoolEnv      = readEnv.andThen(parseBool);
+        Fn1<String, Maybe<Integer>> readIntProperty  = readProperty.andThen(parseInt);
+        Fn1<String, Maybe<Integer>> readIntEnv       = readEnv.andThen(parseInt);
 
-        Function<String, Optional<Integer>> parseInt = s -> {
-            try {
-                return Optional.of(Integer.parseInt(s));
-            } catch (NumberFormatException nfe) {
-                return Optional.empty();
-            }
-        };
-
-        Function<String, Optional<Boolean>> readBoolProperty = readProperty.andThen(opt -> opt.flatMap(parseBool));
-        Function<String, Optional<Boolean>> readBoolEnv      = readEnv.andThen(opt -> opt.flatMap(parseBool));
-
-        Function<String, Optional<Integer>> readIntProperty = readProperty.andThen(opt -> opt.flatMap(parseInt));
-        Function<String, Optional<Integer>> readIntEnv      = readEnv.andThen(opt -> opt.flatMap(parseInt));
-
-        Function<String, Optional<Boolean>> readBool = s -> readBoolProperty.apply(s)
-                .or(() -> readBoolEnv.apply(s));
-        Function<String, Optional<Integer>> readInt = s -> readIntProperty.apply(s)
-                .or(() -> readIntEnv.apply(s));
+        Fn1<String, Maybe<Boolean>> readBool         = s -> first(readBoolProperty.apply(s), readBoolEnv.apply(s));
+        Fn1<String, Maybe<Integer>> readInt          = s -> first(readIntProperty.apply(s), readIntEnv.apply(s));
 
         return new Configuration(
-                readBool.apply(PropertyLabels.MayInterruptFuturesOnCancel.name())
-                        .orElse(DEFAULT.mayInterruptFuturesOnCancel),
                 readBool.apply(PropertyLabels.TreatThunksAsBlocking.name())
                         .orElse(DEFAULT.treatThunksAsBlocking),
                 readInt.apply(PropertyLabels.MaxTicksBeforePreemption.name())

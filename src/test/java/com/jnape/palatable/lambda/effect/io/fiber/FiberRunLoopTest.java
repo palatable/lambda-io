@@ -10,20 +10,16 @@ import org.junit.jupiter.api.Timeout;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.jnape.palatable.lambda.effect.io.fiber.Canceller.canceller;
-import static com.jnape.palatable.lambda.effect.io.fiber.Configuration.DEFAULT;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.cancelled;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.delay;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.failed;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.fiber;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.forever;
-import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.never;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.parallel;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.pin;
 import static com.jnape.palatable.lambda.effect.io.fiber.Fiber.race;
@@ -33,6 +29,8 @@ import static com.jnape.palatable.lambda.effect.io.fiber.FiberRunLoop.fiberRunLo
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.cancellation;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.failure;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.success;
+import static com.jnape.palatable.lambda.effect.io.fiber.RuntimeSettings.DEFAULT;
+import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.Never.never;
 import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.matcher.FiberResultMatcher.yieldsResult;
 import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.scheduler.DecoratingScheduler.before;
 import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.scheduler.SameThread.sameThread;
@@ -50,7 +48,6 @@ import static org.hamcrest.junit.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -58,7 +55,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 public class FiberRunLoopTest {
 
     private static final Environment TEST_ENVIRONMENT =
-            new Environment(sameThread(), sameThread(), sameThread(), Canceller::canceller, DEFAULT);
+            new Environment(sameThread(), sameThread(), sameThread(), Canceller::canceller);
 
     private static final RuntimeException CAUSE = new RuntimeException("blew up");
 
@@ -125,7 +122,7 @@ public class FiberRunLoopTest {
         public void doesNotCatchThrowableFromCallback() {
             AtomicInteger invocationCounter = new AtomicInteger(0);
             try {
-                fiberRunLoop(TEST_ENVIRONMENT)
+                fiberRunLoop(TEST_ENVIRONMENT, DEFAULT)
                         .unsafeRunAsync(fiber(() -> 1), res -> {
                             invocationCounter.incrementAndGet();
                             throw throwChecked(CAUSE);
@@ -273,37 +270,6 @@ public class FiberRunLoopTest {
                        yieldsResult(canceller, equalTo(success())));
             assertFalse(loserExecuted.get());
             assertFalse(canceller.cancelled());
-        }
-    }
-
-    @Nested
-    public class Never {
-
-        @Test
-        public void singleton() {
-            assertThat(never(), sameInstance(never()));
-        }
-
-        @Test
-        public void hasNoRuntimeInterpretation() {
-            assertThrowsExactly(TimeoutException.class, () -> new CompletableFuture<>() {{
-                fiberRunLoop(TEST_ENVIRONMENT).unsafeRunAsync(
-                        never(),
-                        this::complete
-                );
-            }}.get(50, MILLISECONDS));
-        }
-
-        @Test
-        public void canBeCancelled() {
-            Canceller canceller = canceller();
-            canceller.cancel();
-            assertThat(never(), yieldsResult(canceller, equalTo(cancellation())));
-        }
-
-        @Test
-        public void bindIsNoOp() {
-            assertSame(never(), never().bind(__ -> succeeded(1)));
         }
     }
 
