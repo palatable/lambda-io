@@ -10,7 +10,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-import static com.jnape.palatable.lambda.effect.io.fiber.Scheduler.scheduler;
+import static com.jnape.palatable.lambda.effect.io.fiber.Timer.timer;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -20,7 +20,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-public class SchedulerTest {
+public class TimerTest {
 
     @Nested
     @ExtendWith(MockitoExtension.class)
@@ -30,7 +30,7 @@ public class SchedulerTest {
         @Test
         public void delegatesToBackingExecutor() {
             Runnable runnable = () -> {};
-            scheduler(scheduledExecutorService).schedule(runnable, 1, SECONDS);
+            timer(scheduledExecutorService, false).delay(runnable, 1, SECONDS);
 
             verify(scheduledExecutorService).schedule(runnable, 1, SECONDS);
             verifyNoMoreInteractions(scheduledExecutorService);
@@ -41,8 +41,8 @@ public class SchedulerTest {
             ScheduledFuture<?> future = mock(ScheduledFuture.class);
             when(scheduledExecutorService.schedule(any(Runnable.class), anyLong(), any(TimeUnit.class)))
                     .thenAnswer(invocationOnMock -> future);
-            Scheduler scheduler = scheduler(scheduledExecutorService);
-            Runnable  cancel    = scheduler.schedule(() -> {}, 1, SECONDS);
+            Timer    timer  = timer(scheduledExecutorService, false);
+            Runnable cancel = timer.delay(() -> {}, 1, SECONDS);
 
             verifyNoInteractions(future);
             cancel.run();

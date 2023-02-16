@@ -4,15 +4,15 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-public interface Scheduler {
+public interface Timer {
 
-    Runnable schedule(Runnable runnable, long delay, TimeUnit timeUnit);
+    Runnable delay(Runnable runnable, long delay, TimeUnit timeUnit);
 
-    static Scheduler scheduler(ScheduledExecutorService scheduledExecutorService) {
+    static Timer timer(ScheduledExecutorService scheduledExecutorService,
+                       boolean interruptFuturesOnCancel) {
         return (runnable, delay, timeUnit) -> {
             ScheduledFuture<?> future = scheduledExecutorService.schedule(runnable, delay, timeUnit);
-            //todo: interrupt or not?
-            return () -> future.cancel(false);
+            return () -> future.cancel(interruptFuturesOnCancel);
         };
     }
 }

@@ -123,7 +123,7 @@ public class FiberRunLoopTest {
             AtomicInteger invocationCounter = new AtomicInteger(0);
             try {
                 fiberRunLoop(TEST_ENVIRONMENT, DEFAULT)
-                        .unsafeRunAsync(fiber(() -> 1), res -> {
+                        .schedule(fiber(() -> 1), res -> {
                             invocationCounter.incrementAndGet();
                             throw throwChecked(CAUSE);
                         });
@@ -277,9 +277,8 @@ public class FiberRunLoopTest {
     public class Delay {
 
         @Test
-        //todo: "schedules on timer then resumes on scheduler" indicates names here are improvable;
-        //      also, this test is just garbage, figure out a more robust way to demonstrate the assertion
-        public void schedulesOnTimerThenResumesOnScheduler() {
+        //todo: this test is just garbage, figure out a more robust way to demonstrate the assertion
+        public void schedulesOnTimerThenResumesOnExecutor() {
             Fiber<Integer> delay      = delay(succeeded(1), ofNanos(1));
             List<String>   boundaries = new ArrayList<>();
 

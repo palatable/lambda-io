@@ -1,10 +1,13 @@
 package com.jnape.palatable.lambda.effect.io.fiber;
 
 import com.jnape.palatable.lambda.adt.Unit;
+import com.jnape.palatable.lambda.effect.io.fiber.Result.Success;
 
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -15,10 +18,27 @@ import static com.jnape.palatable.lambda.adt.Unit.UNIT;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.cancellation;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.failure;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.success;
+import static com.jnape.palatable.lambda.internal.Runtime.throwChecked;
 import static java.util.Arrays.asList;
 import static java.util.function.Function.identity;
 
 public sealed interface Fiber<A> {
+
+    default void unsafeRunAsync(Consumer<? super Result<A>> callback) {
+        Runtime.JVM.get().schedule(this, callback);
+    }
+
+    default A unsafeRunSync() {
+        Result<A> result = new CompletableFuture<Result<A>>() {{
+            unsafeRunAsync(this::complete);
+        }}.join();
+        if (result instanceof Success<A> success)
+            return success.value();
+        else if (result instanceof Result.Failure<A> failure)
+            throw throwChecked(failure.reason());
+        else
+            throw throwChecked(new CancellationException());
+    }
 
     default <B> Fiber<B> bind(Function<? super A, ? extends Fiber<B>> fn) {
         return new Bind<>(this, fn);
@@ -121,7 +141,7 @@ record Value<A>(Result<A> result) implements Fiber<A> {
 record Pin<A>(Fiber<A> fiber, Executor executor) implements Fiber<A> {
 }
 
-record Forever<A>(Fiber<?> fiber) implements Fiber<A> {
+record Forever<Z, A>(Fiber<Z> fiber) implements Fiber<A> {
 }
 
 record Delay<A>(Fiber<A> fiber, long delay, TimeUnit timeUnit) implements Fiber<A> {
@@ -129,7 +149,7 @@ record Delay<A>(Fiber<A> fiber, long delay, TimeUnit timeUnit) implements Fiber<
 
 record Bind<Z, A>(Fiber<Z> fiberZ, Function<? super Z, ? extends Fiber<A>> f) implements Fiber<A> {
 
-    <R> R eliminate(Eliminator<A, R> eliminator) {
+    private <R> R eliminate(Eliminator<A, R> eliminator) {
         return eliminator.eliminate(fiberZ, f);
     }
 
@@ -155,7 +175,7 @@ record Bind<Z, A>(Fiber<Z> fiberZ, Function<? super Z, ? extends Fiber<A>> f) im
         return rightAssociated;
     }
 
-    interface Eliminator<A, R> {
+    private interface Eliminator<A, R> {
         <Z> R eliminate(Fiber<Z> fiberZ, Function<? super Z, ? extends Fiber<A>> f);
     }
 }

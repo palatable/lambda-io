@@ -21,21 +21,21 @@ public final class FiberRunLoop implements Runtime {
 
     private final Supplier<Canceller> cancellerFactory;
     private final Executor            defaultExecutor;
-    private final Scheduler           scheduler;
+    private final Timer               timer;
     private final int                 maxTicksBeforePreemption;
 
-    private FiberRunLoop(Supplier<Canceller> cancellerFactory, Executor defaultExecutor, Scheduler scheduler,
+    private FiberRunLoop(Supplier<Canceller> cancellerFactory, Executor defaultExecutor, Timer timer,
                          int maxTicksBeforePreemption) {
         this.cancellerFactory         = cancellerFactory;
         this.defaultExecutor          = defaultExecutor;
-        this.scheduler                = scheduler;
+        this.timer                    = timer;
         this.maxTicksBeforePreemption = maxTicksBeforePreemption;
     }
 
     @Override
-    public <A> void unsafeRunAsync(Fiber<A> fiber, Consumer<? super Result<A>> callback) {
+    public <A> void schedule(Fiber<A> fiber, Consumer<? super Result<A>> callback) {
         //todo: wrap callback.accept in a try/catch?
-        schedule(fiber, defaultExecutor, cancellerFactory.get(), (__, ___, res) -> callback.accept(res));
+        preempt(fiber, defaultExecutor, cancellerFactory.get(), Continuation.root(callback));
     }
 
     private <A> void tick(Fiber<A> fiber, Executor executor, Canceller canceller, Continuation<A> continuation,
@@ -45,7 +45,7 @@ public final class FiberRunLoop implements Runtime {
             continuation.accept(stackDepth, executor, cancellation());
         } else {
             if (stackDepth == maxTicksBeforePreemption) {
-                schedule(fiber, executor, canceller, continuation);
+                preempt(fiber, executor, canceller, continuation);
                 return;
             }
 
@@ -62,7 +62,7 @@ public final class FiberRunLoop implements Runtime {
             else if (fiber instanceof Suspension<A> suspension) {
                 //todo: should this be wrapped in try/catch and re-throw as critical error?
                 suspension.k().accept((Consumer<Result<A>>) res -> continuation.accept(stackDepth, executor, res));
-            } else if (fiber instanceof Forever<A> forever) {
+            } else if (fiber instanceof Forever<?, A> forever) {
                 forever(forever, executor, canceller, continuation, stackDepth);
             } else if (fiber instanceof Bind<?, A> bind) {
                 bind(bind, executor, canceller, continuation, stackDepth);
@@ -83,15 +83,15 @@ public final class FiberRunLoop implements Runtime {
         if (pin.executor() == executor) {
             tick(pin.fiber(), executor, canceller, continuation, stackDepth + 1);
         } else {
-            schedule(pin.fiber(), pin.executor(), canceller,
-                     (sd, __, res) -> schedule(result(res), executor, canceller, continuation));
+            preempt(pin.fiber(), pin.executor(), canceller,
+                    (sd, __, res) -> preempt(result(res), executor, canceller, continuation));
         }
     }
 
     private <A> void delay(Delay<A> delay, Executor executor, Canceller canceller, Continuation<A> continuation) {
         //todo: if delay is 0, just keep ticking
-        Runnable cancel = scheduler.schedule(() -> schedule(delay.fiber(), executor, canceller, continuation),
-                                             delay.delay(), delay.timeUnit());
+        Runnable cancel = timer.delay(() -> preempt(delay.fiber(), executor, canceller, continuation),
+                                      delay.delay(), delay.timeUnit());
         if (!canceller.onCancellation(cancel))
             cancel.run();
     }
@@ -100,7 +100,7 @@ public final class FiberRunLoop implements Runtime {
         Canceller     child  = canceller.addChild();
         AtomicBoolean winner = new AtomicBoolean(true);
         for (Fiber<A> fiber : race.fibers()) {
-            schedule(fiber, executor, child, (stackDepth, ex, res) -> {
+            preempt(fiber, executor, child, (stackDepth, ex, res) -> {
                 if (winner.getAndSet(false)) {
                     child.cancel();
                     tick(result(res), ex, canceller, continuation, stackDepth + 1);
@@ -109,13 +109,12 @@ public final class FiberRunLoop implements Runtime {
         }
     }
 
-    private <A> void forever(Forever<A> forever, Executor executor, Canceller canceller,
-                             Continuation<A> continuation, int stackDepth) {
-        @SuppressWarnings("unchecked")
-        Fiber<Object> fiber = (Fiber<Object>) forever.fiber();
+    private <X, A> void forever(Forever<X, A> forever, Executor executor, Canceller canceller,
+                                Continuation<A> continuation, int stackDepth) {
+        Fiber<X> fiber = forever.fiber();
         tick(fiber, executor, canceller, new Continuation<>() {
             @Override
-            public void accept(Integer sd, Executor ex, Result<Object> res) {
+            public void accept(Integer sd, Executor ex, Result<X> res) {
                 if (res instanceof Success<?>)
                     tick(fiber, ex, canceller, this, sd + 1);
                 else
@@ -124,8 +123,8 @@ public final class FiberRunLoop implements Runtime {
         }, stackDepth + 1);
     }
 
-    private <A> void schedule(Fiber<A> fiber, Executor executor, Canceller canceller,
-                              Continuation<A> continuation) {
+    private <A> void preempt(Fiber<A> fiber, Executor executor, Canceller canceller,
+                             Continuation<A> continuation) {
         executor.execute(() -> tick(fiber, executor, canceller, continuation, 0));
     }
 
@@ -137,6 +136,7 @@ public final class FiberRunLoop implements Runtime {
 
     private <X, A> void tick0(Bind<X, A> bind, Executor executor, Canceller canceller,
                               Continuation<A> continuation, int stackDepth) {
+        //todo: tick0 here? we're already guaranteed to be rightAssoc...
         tick(bind.fiberZ(), executor, canceller, (sd, ex, resX) ->
                      tick(resX instanceof Success<X> success
                           //todo: wrap apply() in a try/catch?
@@ -157,7 +157,7 @@ public final class FiberRunLoop implements Runtime {
         Canceller child = canceller.addChild();
         for (int i = 0; i < n; i++) {
             final int finalI = i;
-            schedule(fibers.get(finalI), executor, child, (sd, ex, result) -> {
+            preempt(fibers.get(finalI), executor, child, (sd, ex, result) -> {
                 if (result instanceof Success<X> success) {
                     results[finalI] = success.value();
                     if (remaining.decrementAndGet() == 0) {
@@ -178,10 +178,22 @@ public final class FiberRunLoop implements Runtime {
 
     public static FiberRunLoop fiberRunLoop(Environment environment, RuntimeSettings runtimeSettings) {
         return new FiberRunLoop(environment.cancellerFactory(), environment.defaultExecutor(),
-                                environment.scheduler(), runtimeSettings.maxTicksBeforePreemption());
+                                environment.timer(), runtimeSettings.maxTicksBeforePreemption());
     }
 
-    interface Continuation<A> {
+    public static FiberRunLoop system() {
+        return System.LOADED;
+    }
+
+    private interface Continuation<A> {
         void accept(Integer stackDepth, Executor executor, Result<A> result);
+
+        static <A> Continuation<A> root(Consumer<? super Result<A>> k) {
+            return (__, ___, res) -> k.accept(res);
+        }
+    }
+
+    private static final class System {
+        private static final FiberRunLoop LOADED = fiberRunLoop(Environment.system(), RuntimeSettings.system());
     }
 }

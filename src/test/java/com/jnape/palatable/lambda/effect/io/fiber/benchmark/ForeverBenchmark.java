@@ -6,7 +6,7 @@ import com.jnape.palatable.lambda.effect.io.fiber.Environment;
 import com.jnape.palatable.lambda.effect.io.fiber.Fiber;
 import com.jnape.palatable.lambda.effect.io.fiber.Result;
 import com.jnape.palatable.lambda.effect.io.fiber.Runtime;
-import com.jnape.palatable.lambda.effect.io.fiber.Scheduler;
+import com.jnape.palatable.lambda.effect.io.fiber.Timer;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.OperationsPerInvocation;
@@ -27,7 +27,7 @@ import static com.jnape.palatable.lambda.effect.io.fiber.FiberRunLoop.fiberRunLo
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.cancellation;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.success;
 import static com.jnape.palatable.lambda.effect.io.fiber.RuntimeSettings.DEFAULT;
-import static com.jnape.palatable.lambda.effect.io.fiber.Scheduler.scheduler;
+import static com.jnape.palatable.lambda.effect.io.fiber.Timer.timer;
 import static com.jnape.palatable.lambda.effect.io.fiber.benchmark.Benchmark.OPS_PER_BENCHMARK;
 import static com.jnape.palatable.lambda.effect.io.fiber.benchmark.Benchmark.runBenchmarks;
 import static java.lang.Runtime.getRuntime;
@@ -64,10 +64,10 @@ public class ForeverBenchmark {
             counter                  = 0;
             executorService          = newExecutorService();
             scheduledExecutorService = newSingleThreadScheduledExecutor();
-            Scheduler scheduler = scheduler(scheduledExecutorService);
+            Timer timer = timer(scheduledExecutorService, false);
             executorService.execute(() -> {});
-            scheduler.schedule(() -> {}, 1, MILLISECONDS);
-            runtime = fiberRunLoop(new Environment(scheduler, executorService, executorService, Canceller::canceller), DEFAULT);
+            timer.delay(() -> {}, 1, MILLISECONDS);
+            runtime = fiberRunLoop(new Environment(timer, executorService, executorService, Canceller::canceller), DEFAULT);
         }
 
         @TearDown(Invocation)
@@ -77,7 +77,7 @@ public class ForeverBenchmark {
         }
 
         public Result<Long> run(Fiber<Long> fiber) {
-            runtime.unsafeRunAsync(fiber, future::complete);
+            runtime.schedule(fiber, future::complete);
             return future.join();
         }
 
