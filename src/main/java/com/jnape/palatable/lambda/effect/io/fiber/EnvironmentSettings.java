@@ -2,9 +2,7 @@ package com.jnape.palatable.lambda.effect.io.fiber;
 
 import static com.jnape.palatable.lambda.effect.io.fiber.Settings.loadBoolean;
 
-//todo: enable settings
-public record EnvironmentSettings(boolean interruptFuturesOnCancel/*,
-                                  EventLoopThreading eventLoopThreading*/) {
+public record EnvironmentSettings(boolean interruptFuturesOnCancel) {
 
     public static final EnvironmentSettings DEFAULT = new EnvironmentSettings(false);
 
