@@ -1,6 +1,7 @@
-package com.jnape.palatable.lambda.effect.io.fiber;
+package com.jnape.palatable.lambda.effect.io.fiber.settings;
 
-import static com.jnape.palatable.lambda.effect.io.fiber.Settings.loadInteger;
+import static com.jnape.palatable.lambda.effect.io.fiber.settings.Settings.loadInteger;
+import static com.jnape.palatable.lambda.functions.builtin.fn2.GT.gt;
 
 //todo: enable additional settings
 public record RuntimeSettings(int maxTicksBeforePreemption/*,
@@ -13,14 +14,19 @@ public record RuntimeSettings(int maxTicksBeforePreemption/*,
         return System.LOADED;
     }
 
-    private static final class System {
-        private static final RuntimeSettings LOADED = new RuntimeSettings(
-                loadInteger(PropertyLabels.MaxTicksBeforePreemption.name())
-                        .orElse(DEFAULT.maxTicksBeforePreemption)/*,
+    static final class System {
+        private static final RuntimeSettings LOADED = load();
+
+        static RuntimeSettings load() {
+            return new RuntimeSettings(
+                    loadInteger(PropertyLabels.MaxTicksBeforePreemption.name())
+                            .filter(gt(0))
+                            .orElse(DEFAULT.maxTicksBeforePreemption)/*,
                 loadBoolean(PropertyLabels.DebitBudgetForBindRightAssociation.name())
                         .orElse(DEFAULT.debitBudgetForBindRightAssociation),
                 loadBoolean(PropertyLabels.DebitBudgetForBindRightAssociation.name())
                         .orElse(DEFAULT.debitBudgetForBindRightAssociation)*/);
+        }
 
         enum PropertyLabels {
             DebitBudgetForBindRightAssociation,

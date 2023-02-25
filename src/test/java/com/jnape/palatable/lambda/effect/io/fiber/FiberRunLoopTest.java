@@ -29,7 +29,7 @@ import static com.jnape.palatable.lambda.effect.io.fiber.FiberRunLoop.fiberRunLo
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.cancellation;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.failure;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.success;
-import static com.jnape.palatable.lambda.effect.io.fiber.RuntimeSettings.DEFAULT;
+import static com.jnape.palatable.lambda.effect.io.fiber.settings.RuntimeSettings.DEFAULT;
 import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.Never.never;
 import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.matcher.FiberResultMatcher.yieldsResult;
 import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.scheduler.DecoratingScheduler.before;

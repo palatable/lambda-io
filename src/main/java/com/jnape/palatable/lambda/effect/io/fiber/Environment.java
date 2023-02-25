@@ -1,5 +1,7 @@
 package com.jnape.palatable.lambda.effect.io.fiber;
 
+import com.jnape.palatable.lambda.effect.io.fiber.settings.EnvironmentSettings;
+
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinWorkerThread;

@@ -1,4 +1,4 @@
-package com.jnape.palatable.lambda.effect.io.fiber;
+package com.jnape.palatable.lambda.effect.io.fiber.settings;
 
 import com.jnape.palatable.lambda.adt.Maybe;
 import com.jnape.palatable.lambda.functions.Fn1;
@@ -29,7 +29,7 @@ public final class Settings {
     }
 
     private static <A> Maybe<A> loadAndParse(String label, Fn1<? super String, ? extends Maybe<A>> tryParse) {
-        return maybe(getProperty(label)).flatMap(tryParse).fmap(Maybe::just)
+        return maybe(getProperty(label)).<Maybe<A>>fmap(tryParse)
                 .orElseGet(() -> maybe(getenv(label)).flatMap(tryParse));
     }
 }

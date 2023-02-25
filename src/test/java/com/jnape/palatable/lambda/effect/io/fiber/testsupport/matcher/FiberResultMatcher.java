@@ -17,15 +17,15 @@ import static com.jnape.palatable.lambda.effect.io.fiber.Canceller.canceller;
 import static com.jnape.palatable.lambda.effect.io.fiber.FiberRunLoop.fiberRunLoop;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.failure;
 import static com.jnape.palatable.lambda.effect.io.fiber.Result.success;
-import static com.jnape.palatable.lambda.effect.io.fiber.RuntimeSettings.DEFAULT;
+import static com.jnape.palatable.lambda.effect.io.fiber.settings.RuntimeSettings.DEFAULT;
 import static com.jnape.palatable.lambda.effect.io.fiber.testsupport.scheduler.SameThread.sameThread;
 import static org.hamcrest.Matchers.equalTo;
 
 public final class FiberResultMatcher<A> extends TypeSafeMatcher<Fiber<A>> {
 
-    private final Executor  executor;
-    private final Timer     timer;
-    private final Canceller canceller;
+    private final Executor                   executor;
+    private final Timer                      timer;
+    private final Canceller                  canceller;
     private final Matcher<? super Result<A>> resultMatcher;
 
     private CompletableFuture<Result<? extends A>> result;
