@@ -1,7 +1,11 @@
 package com.jnape.palatable.lambda.effect.io.fiber;
 
+import com.jnape.palatable.lambda.adt.Maybe;
+
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+
+import static com.jnape.palatable.lambda.adt.Maybe.maybe;
 
 public interface Runtime {
 
@@ -13,8 +17,8 @@ public interface Runtime {
         private JVM() {
         }
 
-        public static void set(Runtime runtime) {
-            GLOBAL.set(runtime);
+        public static Maybe<Runtime> set(Runtime runtime) {
+            return maybe(GLOBAL.getAndSet(runtime));
         }
 
         public static Runtime get() {

@@ -22,6 +22,7 @@ import static com.jnape.palatable.lambda.internal.Runtime.throwChecked;
 import static java.util.Arrays.asList;
 import static java.util.function.Function.identity;
 
+//todo: onCancel(Runnable) & catch(e -> Fiber<B>)
 public sealed interface Fiber<A> {
 
     default void unsafeRunAsync(Consumer<? super Result<A>> callback) {

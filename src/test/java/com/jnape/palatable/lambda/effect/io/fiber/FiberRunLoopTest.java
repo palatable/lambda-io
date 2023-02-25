@@ -362,6 +362,15 @@ public class FiberRunLoopTest {
                                 "after"),
                          interactions);
         }
+
+        @Test
+        public void pinningToSameExecutorTicks() {
+            assertThat(pin(fiber((Runnable) () -> interactions.add("fiber")), origin),
+                       yieldsResult(origin, equalTo(success())));
+            assertEquals(asList("on origin",
+                                "fiber"),
+                         interactions);
+        }
     }
 
     @Nested
